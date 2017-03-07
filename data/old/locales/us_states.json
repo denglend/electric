@@ -1,0 +1,10 @@
+{
+		"name":"us_states",
+		"columns": [
+			{
+				"name":"abbreviation",
+				"type":"aka",
+				"aka":"locales.name"
+			}
+		]
+	}

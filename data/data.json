@@ -1,0 +1,76 @@
+[
+	{
+		"name":"locales",
+		"type":"dim",
+		"dependencies":["localetypes","sources"],
+		"columns": {
+			"name" : { "type":"string" },
+			"parent": {
+				"type":"link",
+				"link":"locales.name"
+			},
+			"localetype": {
+				"type":"link",
+				"link":"localetypes.name"
+			},
+			"source": {
+				"type":"link",
+				"link":"sources.name"
+			}
+
+		}
+	},
+
+	{
+		"name":"affiliations",
+		"type":"dim",
+		"dependencies":["affiliationtypes"],
+		"columns": {
+			"name": { "type":"string" },
+			"affiliationtype": {	
+				"type":"link",
+				"link":"affiliationtypes.name"
+			}
+		}
+	},
+
+	{
+		"name":"affiliationtypes",
+		"type":"dim",
+		"dependencies":[],
+		"columns": {
+			"name": { "type":"string" }
+		}
+	},
+
+	{
+		"name":"localetypes",
+		"type":"dim",
+		"dependencies":[],
+		"columns": {
+			"name": {"type":"string"},
+			"parent": {
+				"type":"link",
+				"link":"localetypes.name"
+			}
+		}
+	},
+
+	{
+		"name":"sources",
+		"type":"dim",
+		"dependencies":[],
+		"columns": {
+			"name": {"type":"string" },
+			"URL": {"type":"string"},
+			"date": {"type":"date"},
+			"license": {"type":"string"},
+			"parent": {
+				"type":"link",
+				"link":"sources.name"
+			}
+
+		}
+	}
+
+]

@@ -1,0 +1,19 @@
+{
+  "name": "electric",
+  "version": "0.0.1",
+  "description": "Open Election Data",
+  "dependencies": {
+    "bluebird": "^3.4.7",
+    "csv": "^1.1.1",
+    "deepmerge": "^1.3.2",
+    "pg": "^6.1.2",
+    "pg-copy-streams": "^1.2.0"
+  },
+  "main": "index.js",
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Dan Englender",
+  "license": "MIT"
+}
