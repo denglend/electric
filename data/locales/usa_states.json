@@ -22,7 +22,7 @@
 			},
 			"STATE": {
 				"type":"int",
-				"rename":"state_fips"
+				"servesas":"state_fips"
 			},
 			"STUSAB": {
 				"type":"aka",
@@ -35,7 +35,7 @@
 			},
 			"STATENS": {
 				"type":"int",
-				"rename":"gnis_id"
+				"servesas":"gnis_id"
 			}
 		}
 	}

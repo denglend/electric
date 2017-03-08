@@ -6,7 +6,7 @@ var csvstringify = Promise.promisify(require('csv-stringify'));
 var merge = require('deepmerge');
 var logger = require('./util/logger');
 var secrets = require("./secrets");
-logger.level = "verbose";
+logger.level = "debug";
 
 var pg = require("pg");
 Object.keys(pg).forEach(function(key) {
@@ -97,7 +97,7 @@ async function ParseDataFiles(data) {
 			CreateStr +=");"; 
 			logger.debug(" "+CreateStr,schema.name);
 			PromiseSet.push(db.query(CreateStr));
-			let CreateStrMeta = "CREATE TABLE "+schema.name+"_meta (id integer PRIMARY KEY DEFAULT nextval('"+schema.name+"_metaid'), type varchar(1000), val varchar(1000));";
+			let CreateStrMeta = "CREATE TABLE "+schema.name+"_meta (id integer PRIMARY KEY DEFAULT nextval('"+schema.name+"_metaid'), "+schema.name+"id int, type varchar(1000), val varchar(1000));";
 			let CreateStrAka = "CREATE TABLE "+schema.name+"_aka (id integer PRIMARY KEY DEFAULT nextval('"+schema.name+"_akaid'), "+schema.name+"id int, val varchar(1000));";
 			PromiseSet.push(db.query(CreateStrMeta));
 			PromiseSet.push(db.query(CreateStrAka));
@@ -120,24 +120,12 @@ function GenericAbortError(e) {
 async function LoadDataSetAsync(schema) {
 	/*
 		Load file names
-		Add all other .json filenames to JSONOpenSet
 		Add all .csv filenames to CSVOpenSet
-		Read all JSON files
+		Read all files
 			if there is an all.json, read it and add values to el
 			Add all other JSON files's data to individualized copies of el
 		THEN
 		ParseDataSubFolderNextRound()
-			for each file in JSONOpenSet that has no unmatched dependences
-				Read CSV file data
-				THEN
-				[somehow resolve AKAs and create links]
-				THEN
-				push to PostgreSQL database (using individualized copy of el)
-				THEN
-				Remove from CSV OpenSet and JSON OpenSet
-			THEN
-			if JSONOpenSet and CSVOpenSet are not empty, ParseDataSubFolderNextRound
-
 
 
 
@@ -190,8 +178,7 @@ async function LoadDataSetAsync(schema) {
 		if (DefaultSchemaData.length ==1) {
 			logger.debug("    Found all.json default schema data");
 			schema = merge(schema,DefaultSchemaData[0],{clone:true});
-			//logger.debug("Extending "+schema.name+" schema.  New schema: ");
-			//logger.debug(JSON.stringify(schema,null,4));
+			logger.silly("Extending default "+schema.name+" schema.  New schema: "+JSON.stringify(schema,null,4));
 		}
 		else if (DefaultSchemaData.length >1) throw("    Found more than one default schema JSON file");
 		for (let DataObj of JSONData.filter(function(el) {return el.name.toLowerCase() != "all" && el.name.toLowerCase() != schema.name.toLowerCase();})) {
@@ -201,8 +188,7 @@ async function LoadDataSetAsync(schema) {
 				//Add servesas to all columns that don't have them (so we can easily find the logical col name later)
 				if (FileSchemas[DataObj.name].columns[col].servesas === undefined) FileSchemas[DataObj.name].columns[col].servesas = col;
 			}
-			//logger.debug("Read individual file schema for "+schema.name+"/"+DataObj.name+".  Schema is:");
-			//logger.debug(JSON.stringify(FileSchemas[DataObj.name],null,4));
+			logger.silly("Read individual file schema for "+schema.name+"/"+DataObj.name+".  Schema is:"+JSON.stringify(FileSchemas[DataObj.name],null,4));
 		}
 		for (let CSVName of CSVOpenSet) {
 			if (FileSchemas[CSVName] === undefined) {
@@ -291,9 +277,6 @@ async function LoadDataSetAsync(schema) {
 		if (ConstColumns.length>0) logger.debug("  Const Columns: "+JSON.stringify(ConstColumns),schema.name+'.'+DataSetName);
 		if (ExternalLinkColumns.length >0 || InternalLinkColumns.length > 0) {
 			let LinkIDs = await GetLinkIDsFromDB();
-			/*var LinksLookup = new Map();
-			for (let i in ExternalLinkColumns) LinksLookup.set(ExternalLinkColumns[i],LinkIDs[i].rows);
-			for (let i in InternalLinkColumns) LinksLookup.set(InternalLinkColumns[i],LinkIDs[i].rows);*/
 			var LinksLookup = {};
 			let AllLinkColumns = ExternalLinkColumns.concat(InternalLinkColumns);
 			for (let i in AllLinkColumns) {
@@ -302,26 +285,29 @@ async function LoadDataSetAsync(schema) {
 					LinksLookup[AllLinkColumns[i]].set(j.name,j.id);
 				}
 			}
-			//logger.debug("  LinksLookup Map: "+JSON.stringify(Object.entries(LinksLookup).map(function(el) {return [el[0],Array.from(el[1].entries())];})),schema.name+'.'+DataSetName);
+			logger.silly("  LinksLookup Map: "+JSON.stringify(Object.entries(LinksLookup).map(function(el) {return [el[0],Array.from(el[1].entries())];})),schema.name+'.'+DataSetName);
 		}
 /*CURRENT STATUS: 
 	First
 	Then
 		Need to process namespaces into WHERE clauses for external and internal links
-		COPY meta data cols
+		Subfolders
+		Rename affiliations as elections_affiliations so that it's clear it only applies to elections data
 		Deal with AKAs
 			[make sure there is a mechanism for a AKA-only CSV]
 				Maybe change AKA tables' id seq name to be the same as regular tables, and then could use normal import mechanism from schema_aka folder?
 		Resolve columns that have a mapping eg in usa_county (maybe create a map for each column similar to servesas that exists for each column)
 		Error Handling
 			Do we need TRANSACTION?
-			External/Internal links that can't be resolved
+			External/Internal links that can't be resolved. e.g. - Currently const usa_states parent can't be resolved
 		Testing
 			JSON syntax makes it seem like can link to field other than name --- does this actually work?
 	Then Then
+		Command line options
 		Will ETL functionality be needed to:
 			Read xls/xlsx
 			normalize wide data
+		Add license text so that it can ultimately be displayed on website
 		Cleanup!
 
 */
@@ -358,7 +344,6 @@ async function LoadDataSetAsync(schema) {
 				}
 				else {																//External Link
 					try {
-						//CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = LinksLookup.get(HeaderRow[j]).filter(function(el) {return el.name ==CSVObj[i][j];})[0].id;
 						CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = LinksLookup[HeaderRow[j]].get(CSVObj[i][j]);
 					}
 					catch (e){
@@ -399,7 +384,6 @@ async function LoadDataSetAsync(schema) {
 	
 
 		// RESOLVE INTERNAL LINKS
-		//  Bug fix attempted: This currently only resolves internal links within the same file.  Need to read existing data from DB and combine w/data in file
 		if (InternalLinkColumns.length>0) {
 			logger.verbose("  Pass 2: Resolve internal links: "+InternalLinkColumns/*.map(GetRealColName)*/.join(','),schema.name+'.'+DataSetName);
 			for (let i=0;i<InternalLinkColumns.length;i++) {
@@ -411,30 +395,30 @@ async function LoadDataSetAsync(schema) {
 				for (let j=1;j<CopyArray.length;j++) {
 					CopyArray[j][CopyArrayColPos] = LinksLookup[InternalLinkColumns[i]].get(CopyArray[j][CopyArrayColPos]);
 				}
-				/*let IDLookup = new Map();
-				for (let j=1;j<CopyArray.length;j++) {	//Create map to lookup ID #s
-					IDLookup.set(CopyArray[j][CopyArrayHeader.indexOf("name")],CopyArray[j][CopyArrayHeader.indexOf("id")]);
-				}
-				for (let j=1;j<CopyArray.length;j++) {
-					CopyArray[j][CopyArrayColPos] = IDLookup.get(CopyArray[j][CopyArrayColPos]);
-				}*/
 				CopyArray[0][CopyArrayColPos] += "id";			//Rename header row
-				//logger.debug("  New LinksLookup Map: "+JSON.stringify(Object.entries(LinksLookup).map(function(el) {return [el[0],Array.from(el[1].entries())];})),schema.name+'.'+DataSetName);
+				logger.silly("  New LinksLookup Map: "+JSON.stringify(Object.entries(LinksLookup).map(function(el) {return [el[0],Array.from(el[1].entries())];})),schema.name+'.'+DataSetName);
 			}
 		}
 
 
 
-		
-
-		if (MetaColumns.length>0) {
-			logger.debug("  PLACEHOLDER: Create data array to meta data",schema.name+'.'+DataSetName);
+		//Copy META COLS TO DB
+		if (MetaColumns.length >0 ) {
+			let MetaArray = [[schema.name+'id','type','val']];
+			logger.verbose("  Pass 3: Import Meta Cols: "+MetaColumns.join(','),schema.name+'.'+DataSetName);
+			for (let ColName of MetaColumns) {
+				let ColPos = HeaderRow.indexOf(ColName);
+				for (let j = 0;j<CSVObj.length;j++) {
+					MetaArray.push([CopyArray[j+1][0],GetRealColName(ColName),CSVObj[j][ColPos]]);
+				}
+			}
+			logger.silly("Meta Array: "+JSON.stringify(MetaArray),schema.name+'.'+DataSetName);
+			await CopyArrayToDB(schema.name+'_meta',MetaArray);
 		}
-
 
 		//COPY AKA COLS TO DB
 		if (AKAColumns.length >0) {
-			var AKAArray = [[schema.name+"id","val"]];
+			let AKAArray = [[schema.name+"id","val"]];
 			logger.verbose("  Pass 4: Import AKAs: "+AKAColumns.join(','),schema.name+'.'+DataSetName);
 			for (let ColName of AKAColumns) {
 				let ColPos = HeaderRow.indexOf(ColName);
@@ -442,31 +426,14 @@ async function LoadDataSetAsync(schema) {
 					AKAArray.push([CopyArray[j+1][0],CSVObj[j][ColPos]]);
 				}
 			}
-			//logger.debug("AKA Array: "+JSON.stringify(AKAArray),schema.name+'.'+DataSetName);
-			let AKAStringData = await csvstringify(AKAArray);
-			let s = new stream.Readable();
-			s.push(AKAStringData);
-			s.push(null);
-			try {
-				await StreamToDB(schema.name+"_aka",s,AKAArray[0].join(','));
-			}
-			catch (e) {
-				logger.error("StreamToDB Failed",schema.name+'.'+DataSetName);
-			}
+			logger.silly("AKA Array: "+JSON.stringify(AKAArray),schema.name+'.'+DataSetName);
+			await CopyArrayToDB(schema.name+'_aka',AKAArray);
 		}
 
+
 		//COPY MAIN DATA TO DB
-		let CSVStringData = await csvstringify(CopyArray);
-		var s = new stream.Readable();
-		//s._read = function noop() {};
-		s.push(CSVStringData);
-		s.push(null);
-		try {
-			await StreamToDB(schema.name,s,CopyArray[0].join(','));
-		}
-		catch (e) {
-			logger.error("StreamToDB Failed",schema.name+'.'+DataSetName);
-		}
+		await CopyArrayToDB(schema.name,CopyArray);
+
 
 		/*
 			Resolve external links
@@ -501,6 +468,19 @@ async function LoadDataSetAsync(schema) {
 		CSVOpenSet.splice(CSVOpenSet.indexOf(DataSetName),1);
 		return CSVObj;
 
+		async function CopyArrayToDB(tablename,array) {
+			let CSVStringData = await csvstringify(array);
+			var s = new stream.Readable();
+			s.push(CSVStringData);
+			s.push(null);
+			try {
+				await StreamToDB(tablename,s,array[0].join(','));
+			}
+			catch (e) {
+				logger.error("StreamToDB Failed",schema.name+'.'+DataSetName);
+			}
+
+		}
 		async function StreamToDB(Schema,s,cols) {
 			var client = await db.connect();
 			return new Promise( function(resolve,reject) {
@@ -519,27 +499,31 @@ async function LoadDataSetAsync(schema) {
 				logger.warn("   Column "+colname+" is in CSV file, but not in schema, ignoring",schema.name+'.'+DataSetName);
 				return false;
 			}
+			if (FileSchemas[DataSetName].columns[GetRealColName(colname)] === undefined) return false;
 			return FileSchemas[DataSetName].columns[GetRealColName(colname)].type == "link"
 				&& FileSchemas[DataSetName].columns[GetRealColName(colname)].link.split('.')[0] == schema.name;
 		}
 		function FilterExternalLinkCols(colname) {
 			if (FileSchemas[DataSetName].columns[colname] === undefined) return false;
+			if (FileSchemas[DataSetName].columns[GetRealColName(colname)] === undefined) return false;
 			
 			return FileSchemas[DataSetName].columns[GetRealColName(colname)].type == "link"
 				&& FileSchemas[DataSetName].columns[GetRealColName(colname)].link.split('.')[0] != schema.name;
 		}
 		function FilterAKACols(colname) {
 			if (FileSchemas[DataSetName].columns[colname] === undefined) return false;
-			
+			if (FileSchemas[DataSetName].columns[GetRealColName(colname)] === undefined) return false;
 			return FileSchemas[DataSetName].columns[GetRealColName(colname)].type == "aka";
 		}
 		function FilterDateCols(colname) {
 			if (FileSchemas[DataSetName].columns[colname] === undefined) return false;
+			if (FileSchemas[DataSetName].columns[GetRealColName(colname)] === undefined) return false;
 			return FileSchemas[DataSetName].columns[GetRealColName(colname)].type == "date";
 		}
 		function FilterMetaCols(colname) {
 			if (FileSchemas[DataSetName].columns[colname] === undefined) return false;
-			if (FileSchemas[DataSetName].columns[GetRealColName(colname)].type == "aka") return false;
+			if (FileSchemas[DataSetName].columns[GetRealColName(colname)] !== undefined
+				&& FileSchemas[DataSetName].columns[GetRealColName(colname)].type == "aka") return false;
 			
 			return schema.columns[GetRealColName(colname)] === undefined;
 		}
@@ -547,7 +531,8 @@ async function LoadDataSetAsync(schema) {
 			return MetaColumns.indexOf(colname) == -1
 				&& AKAColumns.indexOf(colname) == -1
 				&& ExternalLinkColumns.indexOf(colname) == -1
-				&& InternalLinkColumns.indexOf(colname) == -1;
+				&& InternalLinkColumns.indexOf(colname) == -1
+				&& (FileSchemas[DataSetName].columns[colname] !== undefined);
 		}
 
 		async function GetLinkIDsFromDB() {
@@ -559,16 +544,14 @@ async function LoadDataSetAsync(schema) {
 				for (let CSVRow of CSVObj) {
 					UniqueList.add(CSVRow[ColPos]);
 				}
-				//logger.debug("Unique Set of "+colname+": "+JSON.stringify(Array.from(UniqueList)),schema.name+'.'+DataSetName);
+				logger.silly("Unique Set of "+colname+": "+JSON.stringify(Array.from(UniqueList)),schema.name+'.'+DataSetName);
 				
-				//var ForeignColName = FileSchemas[DataSetName].columns[colname].link.split(".").reverse()[0];
-				//var ForeignTableName = FileSchemas[DataSetName].columns[colname].link.split(".").reverse()[1];
 				var ForeignColName = FileSchemas[DataSetName].columns[FileSchemas[DataSetName].columns[colname].servesas].link.split(".").reverse()[0];
 				var ForeignTableName = FileSchemas[DataSetName].columns[FileSchemas[DataSetName].columns[colname].servesas].link.split(".").reverse()[1];
 				var DBString = 'SELECT ID,'+ForeignColName+' FROM '+ForeignTableName+' WHERE '+ForeignColName+" IN ('"+Array.from(UniqueList).join("','")+"')";
 				DBString += " UNION ALL SELECT orig.ID,aka.VAL FROM "+ForeignTableName+"_aka aka JOIN "+ForeignTableName+" orig ON aka."+ForeignTableName+"ID = orig.id";
 				DBString += " WHERE val IN ('"+Array.from(UniqueList).join("','")+"');";
-				//logger.debug(" "+DBString,schema.name+'.'+DataSetName);
+				logger.silly(" "+DBString,schema.name+'.'+DataSetName);
 				PromiseSet.push(db.query(DBString));
 			}
 			return Promise.all(PromiseSet);

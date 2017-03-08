@@ -1,0 +1,25 @@
+{
+		"name":"countries",
+		"dependencies":["localetypes","sources"],
+		"columns": {
+			"source": {
+				"type":"link",
+				"link":"sources.name",
+				"constant":"https://mledoze.github.io/countries/"
+			},
+
+			"localetype": {
+				"type":"link",
+				"link":"localetypes.name",
+				"constant":"Country"
+			},
+			"cca2": {
+				"type":"aka",
+				"aka":"locales.name"
+			},
+			"cca3": {
+				"type":"aka",
+				"aka":"locales.name"
+			}
+		}
+	}
