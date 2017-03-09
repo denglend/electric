@@ -5,6 +5,7 @@ var csvparse = Promise.promisify(require('csv-parse'));
 var csvstringify = Promise.promisify(require('csv-stringify'));
 var merge = require('deepmerge');
 var logger = require('./util/logger');
+var file = require('./util/file');
 var secrets = require("./secrets");
 logger.level = "debug";
 
@@ -28,6 +29,7 @@ async function main() {
 		var DataJSONData = await fs.readFileAsync('data/data.json','utf8');
 		logger.debug("PLACEHOLDER: Parse command line options");
 		await ClearDatabase();
+		await file.ClearResultDir();
 		await ParseDataFiles(DataJSONData);
 		await Cont();
 		await db.end();
@@ -297,6 +299,7 @@ async function LoadDataSetAsync(schema) {
 			[make sure there is a mechanism for a AKA-only CSV]
 				Maybe change AKA tables' id seq name to be the same as regular tables, and then could use normal import mechanism from schema_aka folder?
 		Resolve columns that have a mapping eg in usa_county (maybe create a map for each column similar to servesas that exists for each column)
+		If a json has a dependency on xxxxx, should it automatically gain a dependency on xxxxx_aka?  
 		Error Handling
 			Do we need TRANSACTION?
 			External/Internal links that can't be resolved. e.g. - Currently const usa_states parent can't be resolved
@@ -336,6 +339,7 @@ async function LoadDataSetAsync(schema) {
 		var CopyArray = [];
 		var CopyArrayHeader = ["id"].concat(NormalColumns,InternalLinkColumns,ExternalLinkColumns); // Need to rename link columns from eg locale to localeid
 		CopyArray.push(CopyArrayHeader);
+		let UnmatchedLinks = {};
 		for (let i=0;i<CSVObj.length;i++) {									
 			var CurRow = Array(CopyArrayHeader.length).fill(null);
 			for (let j=0;j<HeaderRow.length;j++) {
@@ -343,12 +347,20 @@ async function LoadDataSetAsync(schema) {
 					CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = CSVObj[i][j];
 				}
 				else {																//External Link
-					try {
+					if (LinksLookup[HeaderRow[j]]===undefined) {
+						logger.error("  There was no Lookup Map for external link col "+HeaderRow[j],schema.name+'.'+DataSetName);
+					}
+					else if (LinksLookup[HeaderRow[j]].get(CSVObj[i][j])=== undefined && CSVObj[i][j] != "") {
+						let LinkedTableName = FileSchemas[DataSetName].columns[HeaderRow[j]].link.split('.')[0];
+						if (UnmatchedLinks[LinkedTableName] === undefined) UnmatchedLinks[LinkedTableName] = new Set();
+						UnmatchedLinks[LinkedTableName].add(CSVObj[i][j]);
+					}
+					if (LinksLookup[HeaderRow[j]] !== undefined) {
 						CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = LinksLookup[HeaderRow[j]].get(CSVObj[i][j]);
 					}
-					catch (e){
-						logger.error("  There was no value in DB named "+CSVObj[i][j]+" for linked column "+HeaderRow[j],schema.name+'.'+DataSetName);
-					}
+					
+					
+
 				}
 
 			}
@@ -393,7 +405,19 @@ async function LoadDataSetAsync(schema) {
 					LinksLookup[InternalLinkColumns[i]].set(CopyArray[j][CopyArrayHeader.indexOf("name")],CopyArray[j][CopyArrayHeader.indexOf("id")]);
 				}
 				for (let j=1;j<CopyArray.length;j++) {
-					CopyArray[j][CopyArrayColPos] = LinksLookup[InternalLinkColumns[i]].get(CopyArray[j][CopyArrayColPos]);
+					if (LinksLookup[InternalLinkColumns[i]] === undefined) {
+						logger.error("  There was no Lookup Map for internal link col "+InternalLinkColumns[i],schema.name+'.'+DataSetName);
+					}
+					
+					else if (LinksLookup[InternalLinkColumns[i]].get(CopyArray[j][CopyArrayColPos]) === undefined && CopyArray[j][CopyArrayColPos] != '') {
+						let LinkedTableName = FileSchemas[DataSetName].columns[InternalLinkColumns[i]].link.split('.')[0];
+						if (UnmatchedLinks[LinkedTableName] === undefined) UnmatchedLinks[LinkedTableName] = new Set();
+						UnmatchedLinks[LinkedTableName].add(CopyArray[j][CopyArrayColPos]);
+					}
+					if (LinksLookup[InternalLinkColumns[i]] !== undefined) {
+						CopyArray[j][CopyArrayColPos] = LinksLookup[InternalLinkColumns[i]].get(CopyArray[j][CopyArrayColPos]);
+					}
+					
 				}
 				CopyArray[0][CopyArrayColPos] += "id";			//Rename header row
 				logger.silly("  New LinksLookup Map: "+JSON.stringify(Object.entries(LinksLookup).map(function(el) {return [el[0],Array.from(el[1].entries())];})),schema.name+'.'+DataSetName);
@@ -428,6 +452,17 @@ async function LoadDataSetAsync(schema) {
 			}
 			logger.silly("AKA Array: "+JSON.stringify(AKAArray),schema.name+'.'+DataSetName);
 			await CopyArrayToDB(schema.name+'_aka',AKAArray);
+		}
+
+		//WARN UNMATCHED LINKS
+		for (let col in UnmatchedLinks) {
+			logger.warn("  Unmatched link(s) for: "+col+". See results/"+col+"_aka.csv",schema.name+'.'+DataSetName);
+			let UnmatchedString = "name,val\n";
+			for (let val of Array.from(UnmatchedLinks[col].values())) {
+				UnmatchedString += ','+val+"\n";
+			}
+			logger.debug(UnmatchedString,schema.name+'.'+DataSetName);
+			file.SaveCSVFile("results",col+"_aka.csv",UnmatchedString);
 		}
 
 
