@@ -1,0 +1,15 @@
+{
+		"name":"countries_aka",
+		"dependencies":[],
+		"columns": {
+			"name": {
+				"type":"link",
+				"link":"locales.name",
+				"servesas":"locales"
+			},
+
+			"val": {
+				"type":"string"
+			}
+		}
+	}

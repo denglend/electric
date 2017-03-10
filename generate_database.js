@@ -46,9 +46,25 @@ async function ClearDatabase() {
 async function ParseDataFiles(data) {
 	var DataFileObj = JSON.parse(data);
 	var OpenSet = [];													//names of data sets yet to parse
-	DataFileObj.forEach(function(el) {OpenSet.push(el.name);});				//add all data sets to Open Set
+	
 	var ParseRound = 0;  var PrevOpenLen = -1;
 	await CreateDatabaseTables(DataFileObj);
+	let AKAEntries = [];
+	for (let schema of DataFileObj) {
+		if (schema.type == "dim") {
+			//Auto create aka table's schema in DataFileObj, so that files in that folder can be parsed if needed
+			let AKAEntry = {};
+			AKAEntry.name = schema.name+'_aka';
+			AKAEntry.type = schema.type;
+			AKAEntry.dependencies = [schema.name];
+			AKAEntry.columns = {val:{type:"string"}};
+			AKAEntry.columns[schema.name] =  {type:"link",link:schema.name+".name"};
+			AKAEntries.push(AKAEntry);
+		}
+	}
+	DataFileObj = DataFileObj.concat(AKAEntries);
+
+	DataFileObj.forEach(function(el) {OpenSet.push(el.name);});				//add all data sets to Open Set
 	await ParseDataFileNextRound();
 
 	async function ParseDataFileNextRound() {
@@ -104,7 +120,7 @@ async function ParseDataFiles(data) {
 			PromiseSet.push(db.query(CreateStrMeta));
 			PromiseSet.push(db.query(CreateStrAka));
 
-		}
+		}	
 		return Promise.all(PromiseSet);
 	}
 }
@@ -136,6 +152,7 @@ async function LoadDataSetAsync(schema) {
 	//var JSONOpenSet = [];
 	var CSVOpenSet = [];
 	var CSVClosedSet = [];
+	var CSVAKASet = new Set();
 	var FileSchemas = {};
 	var DataSubFolderRound = 0;
 	var PrevOpenLen = -1;
@@ -143,7 +160,12 @@ async function LoadDataSetAsync(schema) {
 
 	//logger.debug("Initial schema is:");
 	//logger.debug(JSON.stringify(schema,null,4));
-	var FileNameList = await fs.readdirAsync('data/'+schema.name);
+	try {
+		var FileNameList = await fs.readdirAsync('data/'+schema.name);
+	}
+	catch (e) {
+		return;
+	}
 	await SetupSchemas(FileNameList);
 	await ParseDataSubFolderNextRound();
 	return;
@@ -161,6 +183,10 @@ async function LoadDataSetAsync(schema) {
 				logger.debug("   "+fn,schema.name);
 				//JSONOpenSet.push(fn);
 				PromiseSet.push(fs.readFileAsync('data/'+schema.name+'/'+fn));
+			}
+			else if (fn.slice(-8).toLowerCase() == '_aka.csv') {
+				logger.debug("   "+fn,schema.name);
+				CSVAKASet.add(fn.slice(0,-4));
 			}
 			else if (fn.slice(-4).toLowerCase() == '.csv') {
 				logger.debug("   "+fn,schema.name);
@@ -262,13 +288,15 @@ async function LoadDataSetAsync(schema) {
 				}
 			}
 		}
-
 		var ExternalLinkColumns = HeaderRow.filter(FilterExternalLinkCols);
 		var InternalLinkColumns = HeaderRow.filter(FilterInternalLinkCols);
 		var AKAColumns = HeaderRow.filter(FilterAKACols);
 		var MetaColumns = HeaderRow.filter(FilterMetaCols);
 		var NormalColumns = HeaderRow.filter(FilterNormalCols);
 		var DateColumns = HeaderRow.filter(FilterDateCols);
+
+		var ExternalAKAMap = new Map();
+		var HasExternalAKA = CSVAKASet.has(DataSetName+'_aka');
 		
 		if (ExternalLinkColumns.length>0) logger.debug("  External Link Columns: "+JSON.stringify(ExternalLinkColumns),schema.name+'.'+DataSetName); 
 		if (InternalLinkColumns.length>0) logger.debug("  Internal Link Columns: "+JSON.stringify(InternalLinkColumns),schema.name+'.'+DataSetName); 
@@ -337,7 +365,7 @@ async function LoadDataSetAsync(schema) {
 
 		// CREATE MAIN IMPORT ARRAY AND ADD NORMAL AND EXTERNAL LINK COLS
 		var CopyArray = [];
-		var CopyArrayHeader = ["id"].concat(NormalColumns,InternalLinkColumns,ExternalLinkColumns); // Need to rename link columns from eg locale to localeid
+		var CopyArrayHeader = ["id"].concat(NormalColumns,InternalLinkColumns,ExternalLinkColumns); 
 		CopyArray.push(CopyArrayHeader);
 		let UnmatchedLinks = {};
 		for (let i=0;i<CSVObj.length;i++) {									
@@ -377,7 +405,7 @@ async function LoadDataSetAsync(schema) {
 
 		//RENAME EXTERNAL LINKS IN HEADER
 		CopyArray[0] = CopyArray[0].map(function(el) {
-			if (ExternalLinkColumns.indexOf(el) != -1) {
+			if (ExternalLinkColumns.map(GetRealColName).indexOf(el) != -1) {
 				return el+"id";
 			}
 			else {
@@ -391,6 +419,9 @@ async function LoadDataSetAsync(schema) {
 		logger.verbose("  Pass 1: Retrieved "+IDList.rows.length+" new table IDs",schema.name+'.'+DataSetName);
 		for (let i=0;i<CopyArray.length-1;i++) {
 			CopyArray[i+1][CopyArrayHeader.indexOf("id")] = IDList.rows[i].nextval;
+			if (HasExternalAKA) {
+				ExternalAKAMap.set(CopyArray[i+1][CopyArrayHeader.indexOf("name")],IDList.rows[i].nextval);
+			}
 		}
 
 	
@@ -443,7 +474,7 @@ async function LoadDataSetAsync(schema) {
 		//COPY AKA COLS TO DB
 		if (AKAColumns.length >0) {
 			let AKAArray = [[schema.name+"id","val"]];
-			logger.verbose("  Pass 4: Import AKAs: "+AKAColumns.join(','),schema.name+'.'+DataSetName);
+			logger.verbose("  Pass 4: Import Internal AKAs: "+AKAColumns.join(','),schema.name+'.'+DataSetName);
 			for (let ColName of AKAColumns) {
 				let ColPos = HeaderRow.indexOf(ColName);
 				for (let j = 0;j<CSVObj.length;j++) {
@@ -461,13 +492,27 @@ async function LoadDataSetAsync(schema) {
 			for (let val of Array.from(UnmatchedLinks[col].values())) {
 				UnmatchedString += ','+val+"\n";
 			}
-			logger.debug(UnmatchedString,schema.name+'.'+DataSetName);
 			file.SaveCSVFile("results",col+"_aka.csv",UnmatchedString);
 		}
 
 
 		//COPY MAIN DATA TO DB
 		await CopyArrayToDB(schema.name,CopyArray);
+
+		//IMPORT AKAs FROM EXTERNAL AKA FILE
+		if (HasExternalAKA) {
+			logger.verbose("  Pass 5: Import AKAs from external file: "+DataSetName+'_aka.csv',schema.name+'.'+DataSetName);
+			var AKACSVRawData = await fs.readFileAsync('data/'+schema.name+'/'+DataSetName+"_aka.csv",'utf8');
+			var AKACSVObj =  await csvparse(AKACSVRawData);
+			//var AKAHeaderRow = AKACSVObj.splice(0,1)[0];
+			let NamePos = AKACSVObj[0].indexOf("name");
+			for (let i =1;i<AKACSVObj.length;i++) {
+				AKACSVObj[i][NamePos] = ExternalAKAMap.get(AKACSVObj[i][NamePos]);
+			}
+			AKACSVObj[0][NamePos] = schema.name+'id';
+			await CopyArrayToDB(schema.name+'_aka',AKACSVObj);
+
+		}
 
 
 		/*

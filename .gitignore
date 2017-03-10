@@ -2,3 +2,4 @@ secrets.js
 .eslintrc.json
 .jshintrc
 node_modules/
+results/
