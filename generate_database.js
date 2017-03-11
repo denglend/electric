@@ -97,8 +97,10 @@ async function ParseDataFiles(data) {
 		logger.debug("Creating Database Tables");
 		for (let schema of DataFileObj) {
 			PromiseSet.push(db.query("CREATE SEQUENCE "+schema.name+"id START 1; "));
-			PromiseSet.push(db.query("CREATE SEQUENCE "+schema.name+"_akaid START 1; "));
 			PromiseSet.push(db.query("CREATE SEQUENCE "+schema.name+"_metaid START 1; "));
+			if (schema.type =="dim") {
+				PromiseSet.push(db.query("CREATE SEQUENCE "+schema.name+"_akaid START 1; "));
+			}
 		}
 		await Promise.all(PromiseSet);
 		PromiseSet = [];
@@ -116,9 +118,12 @@ async function ParseDataFiles(data) {
 			logger.debug(" "+CreateStr,schema.name);
 			PromiseSet.push(db.query(CreateStr));
 			let CreateStrMeta = "CREATE TABLE "+schema.name+"_meta (id integer PRIMARY KEY DEFAULT nextval('"+schema.name+"_metaid'), "+schema.name+"id int, type varchar(1000), val varchar(1000));";
-			let CreateStrAka = "CREATE TABLE "+schema.name+"_aka (id integer PRIMARY KEY DEFAULT nextval('"+schema.name+"_akaid'), "+schema.name+"id int, val varchar(1000));";
+			if (schema.type=="dim") {
+				let CreateStrAka = "CREATE TABLE "+schema.name+"_aka (id integer PRIMARY KEY DEFAULT nextval('"+schema.name+"_akaid'), "+schema.name+"id int, val varchar(1000));";
+				PromiseSet.push(db.query(CreateStrAka));
+			}
 			PromiseSet.push(db.query(CreateStrMeta));
-			PromiseSet.push(db.query(CreateStrAka));
+			
 
 		}	
 		return Promise.all(PromiseSet);
@@ -323,11 +328,7 @@ async function LoadDataSetAsync(schema) {
 		Need to process namespaces into WHERE clauses for external and internal links
 		Subfolders
 		Rename affiliations as elections_affiliations so that it's clear it only applies to elections data
-		Deal with AKAs
-			[make sure there is a mechanism for a AKA-only CSV]
-				Maybe change AKA tables' id seq name to be the same as regular tables, and then could use normal import mechanism from schema_aka folder?
 		Resolve columns that have a mapping eg in usa_county (maybe create a map for each column similar to servesas that exists for each column)
-		If a json has a dependency on xxxxx, should it automatically gain a dependency on xxxxx_aka?  
 		Error Handling
 			Do we need TRANSACTION?
 			External/Internal links that can't be resolved. e.g. - Currently const usa_states parent can't be resolved
