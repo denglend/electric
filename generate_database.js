@@ -137,6 +137,7 @@ function Cont() {
 
 function GenericAbortError(e) {
 	logger.error(e);
+	logger.error(e.stack);
 	process.exitCode = 1;
 }
 
@@ -217,6 +218,7 @@ async function LoadDataSetAsync(schema) {
 		for (let DataObj of JSONData.filter(function(el) {return el.name.toLowerCase() != "all" && el.name.toLowerCase() != schema.name.toLowerCase();})) {
 			if (DataObj.name === undefined)  throw("    No name in JSON file - "+JSON.stringify(DataObj));
 			FileSchemas[DataObj.name] = merge(schema,DataObj,{clone:true});
+			if (DataObj.columns !== undefined) FileSchemas[DataObj.name].columns = merge(schema.columns,DataObj.columns,{clone:true});
 			for (let col in FileSchemas[DataObj.name].columns) { 
 				//Add servesas to all columns that don't have them (so we can easily find the logical col name later)
 				if (FileSchemas[DataObj.name].columns[col].servesas === undefined) FileSchemas[DataObj.name].columns[col].servesas = col;
@@ -293,6 +295,20 @@ async function LoadDataSetAsync(schema) {
 				}
 			}
 		}
+
+		//ADD VIRTUAL COLUMNS
+		var	VirtualColumns = [];
+		for (let i in FileSchemas[DataSetName].columns) { if (FileSchemas[DataSetName].columns[i].virtualcalc !== undefined) VirtualColumns.push(i);}
+		if (VirtualColumns.length >0) {
+			logger.debug("  Adding in "+VirtualColumns.length+" virtual cols",schema.name+'.'+DataSetName);
+			for (let i=0;i<VirtualColumns.length;i++) {
+				HeaderRow.push(VirtualColumns[i]);
+				for (let j=0;j<CSVObj.length;j++) {
+					CSVObj[j].push(GetVirtualCalcVal(CSVObj[j],FileSchemas[DataSetName].columns[VirtualColumns[i]].virtualcalc));
+				}
+			}
+		}
+
 		var ExternalLinkColumns = HeaderRow.filter(FilterExternalLinkCols);
 		var InternalLinkColumns = HeaderRow.filter(FilterInternalLinkCols);
 		var AKAColumns = HeaderRow.filter(FilterAKACols);
@@ -332,6 +348,7 @@ async function LoadDataSetAsync(schema) {
 		Error Handling
 			Do we need TRANSACTION?
 			External/Internal links that can't be resolved. e.g. - Currently const usa_states parent can't be resolved
+			Dependencies on data sources that don't exist (currently not flagged, probably should be WARN or ERROR)
 		Testing
 			JSON syntax makes it seem like can link to field other than name --- does this actually work?
 	Then Then
@@ -372,20 +389,23 @@ async function LoadDataSetAsync(schema) {
 		for (let i=0;i<CSVObj.length;i++) {									
 			var CurRow = Array(CopyArrayHeader.length).fill(null);
 			for (let j=0;j<HeaderRow.length;j++) {
+				if (CopyArrayHeader.indexOf(HeaderRow[j]) == -1) continue;
 				if (ExternalLinkColumns.indexOf(HeaderRow[j]) == -1) {				//Normal data
-					CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = CSVObj[i][j];
+					CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = TransformVal(CSVObj[i][j],HeaderRow[j]);
 				}
 				else {																//External Link
 					if (LinksLookup[HeaderRow[j]]===undefined) {
 						logger.error("  There was no Lookup Map for external link col "+HeaderRow[j],schema.name+'.'+DataSetName);
 					}
-					else if (LinksLookup[HeaderRow[j]].get(CSVObj[i][j])=== undefined && CSVObj[i][j] != "") {
-						let LinkedTableName = FileSchemas[DataSetName].columns[HeaderRow[j]].link.split('.')[0];
+					else if (LinksLookup[HeaderRow[j]].get(TransformVal(CSVObj[i][j],HeaderRow[j]))=== undefined && CSVObj[i][j] != "") {
+						logger.silly("HeaderRow[j]: "+HeaderRow[j],schema.name+'.'+DataSetName);
+						logger.silly("FileSchemas[DataSetName].columns[HeaderRow[j]]: "+JSON.stringify(FileSchemas[DataSetName].columns[HeaderRow[j]]),schema.name+'.'+DataSetName);
+						let LinkedTableName = FileSchemas[DataSetName].columns[GetRealColName(HeaderRow[j])].link.split('.')[0];
 						if (UnmatchedLinks[LinkedTableName] === undefined) UnmatchedLinks[LinkedTableName] = new Set();
-						UnmatchedLinks[LinkedTableName].add(CSVObj[i][j]);
+						UnmatchedLinks[LinkedTableName].add(TransformVal(CSVObj[i][j],HeaderRow[j]));
 					}
 					if (LinksLookup[HeaderRow[j]] !== undefined) {
-						CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = LinksLookup[HeaderRow[j]].get(CSVObj[i][j]);
+						CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = LinksLookup[HeaderRow[j]].get(TransformVal(CSVObj[i][j],HeaderRow[j]));
 					}
 					
 					
@@ -465,7 +485,7 @@ async function LoadDataSetAsync(schema) {
 			for (let ColName of MetaColumns) {
 				let ColPos = HeaderRow.indexOf(ColName);
 				for (let j = 0;j<CSVObj.length;j++) {
-					MetaArray.push([CopyArray[j+1][0],GetRealColName(ColName),CSVObj[j][ColPos]]);
+					MetaArray.push([CopyArray[j+1][0],GetRealColName(ColName),TransformVal(CSVObj[j][ColPos],ColName)]);
 				}
 			}
 			logger.silly("Meta Array: "+JSON.stringify(MetaArray),schema.name+'.'+DataSetName);
@@ -479,7 +499,7 @@ async function LoadDataSetAsync(schema) {
 			for (let ColName of AKAColumns) {
 				let ColPos = HeaderRow.indexOf(ColName);
 				for (let j = 0;j<CSVObj.length;j++) {
-					AKAArray.push([CopyArray[j+1][0],CSVObj[j][ColPos]]);
+					AKAArray.push([CopyArray[j+1][0],TransformVal(CSVObj[j][ColPos],ColName)]);
 				}
 			}
 			logger.silly("AKA Array: "+JSON.stringify(AKAArray),schema.name+'.'+DataSetName);
@@ -516,34 +536,6 @@ async function LoadDataSetAsync(schema) {
 		}
 
 
-		/*
-			Resolve external links
-				Calculate WHERE clause from namespace
-				Generate unique set  of link vals? 
-				Build 2-column query (value,ID)
-				Run to generate LinksLookup Map
-			Prepare data for COPY: Create array of arrays
-				Generate list of ID numbers using SELECT nextval('seq') from generate_series(1,DataSetRows.length);
-				BEGIN TRANSACTION?
-				Push ID numbers into array
-				Go through all non-AKA columns & non-internal link cols in schema 
-					If in parent schema (i.e. have dedicated col in table), push into main array
-						For links: lookup link value in previous query result ---> Error if not found [error only on pass2?]
-						For remaining columns: use value with optional mapping
-					If not in parent schema (i.e. go in metadata table), push into meta arrat based on data type
-						For links: lookup link value in previous query result ---> Error if not found
-						For remaining columns: use value with optional mapping
-					[Maybe it's possible to add to link table here and then do 2nd pass to resolve internal links]
-					[Maybe 2nd pass to resolve links?]
-			COPY to main table
-			COPY to meta table
-			Resolve and COPY AKAs
-			END TRANSACTION
-
-
-
-		*/
-
 
 		CSVClosedSet.push(DataSetName);
 		CSVOpenSet.splice(CSVOpenSet.indexOf(DataSetName),1);
@@ -574,6 +566,48 @@ async function LoadDataSetAsync(schema) {
 		function GetRealColName(colname) {
 			//Returns the servesas colname for given CSV column name --- in other words the schema column that the CSV column is an alias for
 			return FileSchemas[DataSetName].columns[colname].servesas;
+		}
+		function TransformVal(val,colname) {
+			//Returns the given value with any transformations specified by the column schema applied
+			val = val === null ? null : val.replace(/'/g, "''").trim();
+			if (FileSchemas[DataSetName].columns[colname].mapping !== undefined) {
+				let match = undefined;
+				if (FileSchemas[DataSetName].columns[colname].mapping.regex !== undefined) {
+					for (let restr in FileSchemas[DataSetName].columns[colname].mapping.regex) {
+						let re = new RegExp(restr);
+						if (val.search(re) != -1) {
+							match = val.replace(re,FileSchemas[DataSetName].columns[colname].mapping.regex[restr]);
+						}
+					}
+				}
+				if (FileSchemas[DataSetName].columns[colname].mapping.direct !== undefined) {
+					if (FileSchemas[DataSetName].columns[colname].mapping.direct[val] !== undefined) {
+						match = FileSchemas[DataSetName].columns[colname].mapping.direct[val];
+					}
+				}
+				if (match  === undefined) {
+					debugger;
+					logger.warn("Mapping undefined for val: '"+val+"' of column: '"+colname+"'",schema.name+'.'+DataSetName);
+				}
+				else {
+					val = match;
+				}
+			}
+			if (FileSchemas[DataSetName].columns[colname].prefix !== undefined) val = FileSchemas[DataSetName].columns[colname].prefix+val;
+			if (FileSchemas[DataSetName].columns[colname].suffix !== undefined) val = FileSchemas[DataSetName].columns[colname].suffix+val;
+			return val;
+		}
+		function GetVirtualCalcVal(row,virtualcalc) {
+			var curval;
+			for (let step of virtualcalc) {
+				if (step[0] == "readfrom") {
+					curval = row[HeaderRow.indexOf(step[1])];
+				}
+				else {
+					logger.error("Unknown virtual calculation: "+step[0],schema.name+'.'+DataSetName);
+				}
+			}
+			return curval;
 		}
 		function FilterInternalLinkCols(colname) {
 			if (FileSchemas[DataSetName].columns[colname] === undefined) {
@@ -623,7 +657,7 @@ async function LoadDataSetAsync(schema) {
 				let ColPos = HeaderRow.indexOf(colname);
 				let UniqueList = new Set();
 				for (let CSVRow of CSVObj) {
-					UniqueList.add(CSVRow[ColPos]);
+					UniqueList.add(TransformVal(CSVRow[ColPos],colname));
 				}
 				logger.silly("Unique Set of "+colname+": "+JSON.stringify(Array.from(UniqueList)),schema.name+'.'+DataSetName);
 				

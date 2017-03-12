@@ -22,20 +22,76 @@
 	},
 
 	{
-		"name":"affiliations",
+		"name":"election_candidates",
 		"type":"dim",
-		"dependencies":["affiliationtypes"],
+		"dependencies":["election_affiliations"],
+		"columns": {
+			"name": {"type":"string"},
+			"affiliation": {
+				"type":"link",
+				"link":"election_affiliations.name"
+			}
+		}
+	},
+	{
+		"name":"election_contesttypes",
+		"type":"dim",
+		"dependencies":[],
+		"columns": {
+			"name":{"type":"string"}
+		}
+	},
+
+	{
+		"name":"election_votes",
+		"type":"fact",
+		"dependencies": ["locales","election_candidates","election_contesttypes","election_affiliations"],
+		"columns": {
+			"contesttype": {
+				"type":"link",
+				"link":"election_contesttypes.name"
+			},
+			"votelocale": {
+				"type":"link",
+				"link":"locales.name"
+			},
+			"contestlocale": {
+				"type":"link",
+				"link":"locales.name"
+			},
+			"candidate": {
+				"type":"link",
+				"link":"election_candidates.name"
+			},
+			"electiondate": {
+				"type":"date"
+			},
+			"affiliation": {
+				"type":"link",
+				"link":"election_affiliations.name"
+			},
+			"count": {
+				"type":"int"
+			}
+
+		}
+	},
+
+	{
+		"name":"election_affiliations",
+		"type":"dim",
+		"dependencies":["election_affiliationtypes"],
 		"columns": {
 			"name": { "type":"string" },
 			"affiliationtype": {	
 				"type":"link",
-				"link":"affiliationtypes.name"
+				"link":"election_affiliationtypes.name"
 			}
 		}
 	},
 
 	{
-		"name":"affiliationtypes",
+		"name":"election_affiliationtypes",
 		"type":"dim",
 		"dependencies":[],
 		"columns": {

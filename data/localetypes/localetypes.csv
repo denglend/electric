@@ -5,3 +5,6 @@ City,County
 County,State
 Precinct,City
 Zip Code,State
+Ward,City
+Advisory Neighborhood Commission,Ward
+Advisory Neighborhood Commission Single Member District,Advisory Neighborhood Commission
