@@ -1,0 +1,4 @@
+{
+	"name":"dc_local",
+	"dependencies":["locales.usa_states"]
+}

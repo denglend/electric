@@ -1,0 +1,100 @@
+{
+		"name":"dc_11_8_2016",
+		"namespace": [
+			{
+				"type":"link",
+				"linkname":"locales.parent.parent.name",
+				"linkvalue":"Washington, DC"
+			},
+			{
+				"type":"link",
+				"linkname":"locales.localestype.name",
+				"linkvalue":"Precinct"
+			}
+		],
+		"columns": {
+			"ELECTION_DATE": {
+				"servesas":"electiondate"
+			},
+			"CONTEST_NAME": {
+				"servesas":"contesttype",
+				"mapping": {
+					"direct": {
+						"REGISTERED VOTERS - TOTAL":"Contest Meta",
+						"BALLOTS CAST - TOTAL":"Contest Meta",
+						"BALLOTS CAST - BLANK":"Contest Meta",
+						"AT - LARGE MEMBER OF THE COUNCIL DISTRICT OF COLUMBIA":"Member of the Council",
+						"UNITED STATES REPRESENTATIVE DISTRICT OF COLUMBIA":"Member of the House of Representatives",
+						"UNITED STATES SENATOR DISTRICT OF COLUMBIA":"Senator",
+						"ADVISORY REFERENDUM B DISTRICT OF COLUMBIA":"Referendum",
+						"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"Chairman of the Council"			
+						
+					},
+					"regex": {
+						".*?([0-9]{1}[A-Z]{1}[0-9]{2}) SINGLE MEMBER.*":"Commissioner",
+						"ADVISORY NEIGHBORHOOD COMMISSIONER ([0-9]{1}[A-Z]{1}[0-9]{2})":"Commissioner",
+						".*MEMBER.*STATE BOARD.*":"Member of the Board of Education",
+						".*MEMBER OF THE COUNCIL.*":"Member of the Council",
+						".*Proposed Charter Amendment.*":"Referendum",
+						".*DELEGATE.*U.S. HOUSE OF REPRESENTATIVES.*":"Delegate to the House of Representatives",
+						".*PRESIDENT AND VICE PRESIDENT.*":"President"
+					}
+
+
+				}
+			},
+
+			"PRECINCT_NUMBER": {
+				"prefix": "Precinct ",
+				"servesas":"votelocale"
+			},
+			"CANDIDATE": {
+				"servesas":"candidate"
+			},
+			"VOTES": {
+				"servesas":"count"
+			},
+			"PARTY": {
+				"servesas":"affiliation"
+
+			},
+			"cl": {
+				"virtualcalc": [
+					["readfrom","CONTEST_NAME"]
+				],
+				"servesas":"contestlocale",
+				"mapping": {
+					"direct": {
+						"BALLOTS CAST - BLANK":"District of Columbia",
+						"BALLOTS CAST - TOTAL":"District of Columbia",
+						
+						
+						"REGISTERED VOTERS - TOTAL":"District of Columbia",
+						"UNITED STATES REPRESENTATIVE DISTRICT OF COLUMBIA":"District of Columbia",
+						"UNITED STATES SENATOR DISTRICT OF COLUMBIA":"District of Columbia",
+						"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"District of Columbia"
+					},
+					"regex": {
+						".*?([0-9]{1}[A-Z]{1}[0-9]{2}) SINGLE MEMBER.*":"ANC SMD $1",
+						"ADVISORY NEIGHBORHOOD COMMISSIONER ([0-9]{1}[A-Z]{1}[0-9]{2})":"ANC SMD $1",
+						".*DELEGATE.*U\\.S\\. HOUSE OF REPRESENTATIVES.*":"District of Columbia",
+						".*Proposed Charter Amendment.*":"District of Columbia",
+						".*ADVISORY REFERENDUM.*":"District of Columbia",
+						".*AT - LARGE MEMBER.*":"District of Columbia",
+						".*WARD ONE.*":"Ward 1",
+						".*WARD TWO.*":"Ward 2",
+						".*WARD THREE.*":"Ward 3",
+						".*WARD FOUR.*":"Ward 4",
+						".*WARD FIVE.*":"Ward 5",
+						".*WARD SIX.*":"Ward 6",
+						".*WARD SEVEN.*":"Ward 7",
+						".*WARD EIGHT.*":"Ward 8",
+						".*PRESIDENT AND VICE PRESIDENT.*":"United States"
+					}
+
+
+				}
+			}
+
+		}
+	}
