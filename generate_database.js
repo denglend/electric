@@ -3,6 +3,8 @@ const stream = require('stream');
 var fs = Promise.promisifyAll(require('fs'));
 var csvparse = Promise.promisify(require('csv-parse'));
 var csvstringify = Promise.promisify(require('csv-stringify'));
+var dir = require('node-dir');
+dir.filesAsync = Promise.promisify(dir.files);
 var merge = require('deepmerge');
 var XLSX = require('xlsx');
 var logger = require('./util/logger');
@@ -151,9 +153,6 @@ async function LoadDataSetAsync(schema) {
 			Add all other JSON files's data to individualized copies of el
 		THEN
 		ParseDataSubFolderNextRound()
-
-
-
 	*/
 
 	//var JSONOpenSet = [];
@@ -168,9 +167,12 @@ async function LoadDataSetAsync(schema) {
 	//logger.debug("Initial schema is:");
 	//logger.debug(JSON.stringify(schema,null,4));
 	try {
-		var FileNameList = await fs.readdirAsync('data/'+schema.name);
+		//var FileNameList = await fs.readdirAsync('data/'+schema.name);
+		var FileNameList = await dir.filesAsync('data/'+schema.name);
+		logger.debug("Files: "+JSON.stringify(FileNameList),schema.name);
 	}
 	catch (e) {
+		logger.error("filesAsync error: "+e,schema.name);
 		return;
 	}
 	await SetupSchemas(FileNameList);
@@ -182,7 +184,9 @@ async function LoadDataSetAsync(schema) {
 		var PromiseSet = [];
 		logger.debug("  Entering SetupSchemas. Found Files:",schema.name);
 		filenames.forEach(function(fn) {
-			if (fn.toLowerCase() == 'all.json') {
+			fn = fn.replace(/data\/.*?\//,'');
+			//if (fn.toLowerCase() == 'all.json') {
+			if (fn.slice(-8).toLowerCase() == 'all.json') {
 				logger.debug("   "+fn,schema.name);
 				PromiseSet.push(fs.readFileAsync('data/'+schema.name+'/'+fn));
 			}
@@ -211,15 +215,42 @@ async function LoadDataSetAsync(schema) {
 		//Copy default schema for each CSV file that does not have a json file
 		//logger.debug("Entering CreateFileSchemas");
 		JSONData = JSONData.map(JSON.parse);
-		var DefaultSchemaData = JSONData.filter(function(el) {return el.name.toLowerCase() == "all" || el.name.toLowerCase() == schema.name.toLowerCase();});
-		if (DefaultSchemaData.length ==1) {
-			logger.debug("    Found all.json default schema data");
-			schema = merge(schema,DefaultSchemaData[0],{clone:true});
-			logger.silly("Extending default "+schema.name+" schema.  New schema: "+JSON.stringify(schema,null,4));
+		let JSONLookup = JSONData.map(function(el) {return el.name;});
+
+		for (let CSVNameWExt of CSVOpenSet) {
+			// Make sure every CSV file will have a schema in JSONData so that inheretance will work correctly.
+			let CSVName = file.RemoveFileExtension(CSVNameWExt);
+			if (JSONLookup.indexOf(CSVName) == -1) {
+				logger.debug("    No explicit schema file for so using default schema",schema.name+'.'+CSVName);
+				JSONLookup.push(CSVName);
+				JSONData.push({name:CSVName});
+			}
 		}
-		else if (DefaultSchemaData.length >1) throw("    Found more than one default schema JSON file");
-		for (let DataObj of JSONData.filter(function(el) {return el.name.toLowerCase() != "all" && el.name.toLowerCase() != schema.name.toLowerCase();})) {
+
+		for (let DataObj of JSONData) {
 			if (DataObj.name === undefined)  throw("    No name in JSON file - "+JSON.stringify(DataObj));
+
+			
+			//Find every all.json file in the directory tree
+			logger.silly("JSONLookup: "+JSON.stringify(JSONLookup),schema.name);
+			let CurDir= DataObj.name;// = DataObj.name.replace(/[^\/]*$/,'');
+			let AllSchemaList = [];
+			do  {
+				CurDir = CurDir.slice(0,-1).replace(/[^\/]*$/,'');
+				logger.silly('Checking to see if exists: data/'+schema.name+"/"+CurDir+"all.json",schema.name);
+				let JSONDataPos = JSONLookup.indexOf(CurDir+'all');
+				if (JSONDataPos != -1) {
+					logger.silly(" It does",schema.name);
+					AllSchemaList.push(JSONData[JSONDataPos]);
+				}
+				
+			} while (CurDir !='');
+			for (let i=AllSchemaList.length;i>0;i--) {
+				//Apply in reverse order (from root to leaf of directory tree)
+				let DataObjNew = merge(AllSchemaList[i-1],DataObj,{clone:true});
+				if (AllSchemaList[i-1].columns !== undefined && DataObj.columns !==undefined ) DataObjNew.columns = merge(AllSchemaList[i-1].columns,DataObj.columns,{clone:true});
+				DataObj = DataObjNew;
+			}
 			FileSchemas[DataObj.name] = merge(schema,DataObj,{clone:true});
 			if (DataObj.columns !== undefined) FileSchemas[DataObj.name].columns = merge(schema.columns,DataObj.columns,{clone:true});
 			for (let col in FileSchemas[DataObj.name].columns) { 
@@ -228,6 +259,7 @@ async function LoadDataSetAsync(schema) {
 			}
 			logger.silly("Read individual file schema for "+schema.name+"/"+DataObj.name+".  Schema is:"+JSON.stringify(FileSchemas[DataObj.name],null,4));
 		}
+		/*
 		for (let CSVNameWExt of CSVOpenSet) {
 			let CSVName = file.RemoveFileExtension(CSVNameWExt);
 			if (FileSchemas[CSVName] === undefined) {
@@ -238,7 +270,7 @@ async function LoadDataSetAsync(schema) {
 					if (FileSchemas[CSVName].columns[col].servesas === undefined) FileSchemas[CSVName].columns[col].servesas = col;
 				}
 			}
-		}
+		}*/
 
 	}
 	async function ParseDataSubFolderNextRound() {
