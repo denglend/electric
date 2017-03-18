@@ -9,6 +9,7 @@ var merge = require('deepmerge');
 var XLSX = require('xlsx');
 var logger = require('./util/logger');
 var file = require('./util/file');
+var str = require('./util/str');
 var secrets = require("./secrets");
 logger.level = "debug";
 
@@ -377,7 +378,7 @@ async function LoadDataSetAsync(schema) {
 			for (let i in AllLinkColumns) {
 				LinksLookup[AllLinkColumns[i]] = new Map();
 				for (let j of LinkIDs[i].rows) {
-					LinksLookup[AllLinkColumns[i]].set(j.name,j.id);
+					LinksLookup[AllLinkColumns[i]].set(j.name.toLowerCase(),j.id);
 				}
 			}
 			logger.silly("  LinksLookup Map: "+JSON.stringify(Object.entries(LinksLookup).map(function(el) {return [el[0],Array.from(el[1].entries())];})),schema.name+'.'+DataSetName);
@@ -445,7 +446,7 @@ async function LoadDataSetAsync(schema) {
 					if (LinksLookup[HeaderRow[j]]===undefined) {
 						logger.error("  There was no Lookup Map for external link col "+HeaderRow[j],schema.name+'.'+DataSetName);
 					}
-					else if (LinksLookup[HeaderRow[j]].get(TransformVal(CSVObj[i][j],HeaderRow[j]))=== undefined && CSVObj[i][j] != "") {
+					else if (LinksLookup[HeaderRow[j]].get(str.SafeToLowerCase(TransformVal(CSVObj[i][j],HeaderRow[j])))=== undefined && CSVObj[i][j] != "" && CSVObj[i][j] !== null && CSVObj[i][j] !== undefined) {
 						logger.silly("HeaderRow[j]: "+HeaderRow[j],schema.name+'.'+DataSetName);
 						logger.silly("FileSchemas[DataSetName].columns[HeaderRow[j]]: "+JSON.stringify(FileSchemas[DataSetName].columns[HeaderRow[j]]),schema.name+'.'+DataSetName);
 						let LinkedTableName = FileSchemas[DataSetName].columns[GetRealColName(HeaderRow[j])].link.split('.')[0];
@@ -453,7 +454,7 @@ async function LoadDataSetAsync(schema) {
 						UnmatchedLinks[LinkedTableName].add(TransformVal(CSVObj[i][j],HeaderRow[j]));
 					}
 					if (LinksLookup[HeaderRow[j]] !== undefined) {
-						CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = LinksLookup[HeaderRow[j]].get(TransformVal(CSVObj[i][j],HeaderRow[j]));
+						CurRow[CopyArrayHeader.indexOf(HeaderRow[j])] = LinksLookup[HeaderRow[j]].get(str.SafeToLowerCase(TransformVal(CSVObj[i][j],HeaderRow[j])));
 					}
 					
 					
@@ -502,20 +503,20 @@ async function LoadDataSetAsync(schema) {
 				let CopyArrayColPos = CopyArrayHeader.indexOf(InternalLinkColumns[i]);
 				if (LinksLookup[InternalLinkColumns[i]] === undefined) LinksLookup[InternalLinkColumns[i]] = new Map();
 				for (let j=1;j<CopyArray.length;j++) {	//Create map to lookup ID #s
-					LinksLookup[InternalLinkColumns[i]].set(CopyArray[j][CopyArrayHeader.indexOf("name")],CopyArray[j][CopyArrayHeader.indexOf("id")]);
+					LinksLookup[InternalLinkColumns[i]].set(str.SafeToLowerCase(CopyArray[j][CopyArrayHeader.indexOf("name")]),CopyArray[j][CopyArrayHeader.indexOf("id")]);
 				}
 				for (let j=1;j<CopyArray.length;j++) {
 					if (LinksLookup[InternalLinkColumns[i]] === undefined) {
 						logger.error("  There was no Lookup Map for internal link col "+InternalLinkColumns[i],schema.name+'.'+DataSetName);
 					}
 					
-					else if (LinksLookup[InternalLinkColumns[i]].get(CopyArray[j][CopyArrayColPos]) === undefined && CopyArray[j][CopyArrayColPos] != '') {
+					else if (LinksLookup[InternalLinkColumns[i]].get(str.SafeToLowerCase(CopyArray[j][CopyArrayColPos])) === undefined && CopyArray[j][CopyArrayColPos] != '') {
 						let LinkedTableName = FileSchemas[DataSetName].columns[InternalLinkColumns[i]].link.split('.')[0];
 						if (UnmatchedLinks[LinkedTableName] === undefined) UnmatchedLinks[LinkedTableName] = new Set();
 						UnmatchedLinks[LinkedTableName].add(CopyArray[j][CopyArrayColPos]);
 					}
 					if (LinksLookup[InternalLinkColumns[i]] !== undefined) {
-						CopyArray[j][CopyArrayColPos] = LinksLookup[InternalLinkColumns[i]].get(CopyArray[j][CopyArrayColPos]);
+						CopyArray[j][CopyArrayColPos] = LinksLookup[InternalLinkColumns[i]].get(str.SafeToLowerCase(CopyArray[j][CopyArrayColPos]));
 					}
 					
 				}
@@ -559,7 +560,7 @@ async function LoadDataSetAsync(schema) {
 			logger.warn("  Unmatched link(s) for: "+col+". See results/"+col+"_aka.csv",schema.name+'.'+DataSetName);
 			let UnmatchedString = "name,val\n";
 			for (let val of Array.from(UnmatchedLinks[col].values())) {
-				UnmatchedString += ','+val+"\n";
+				UnmatchedString += ',"'+val+'"'+"\n";
 			}
 			file.SaveCSVFile("results",col+"_aka.csv",UnmatchedString);
 		}
@@ -652,6 +653,12 @@ async function LoadDataSetAsync(schema) {
 				if (step[0] == "readfrom") {
 					curval = row[HeaderRow.indexOf(step[1])];
 				}
+				else if (step[0] == "replace_regexp") {
+					if (curval !== undefined && curval !== null) {
+						let re = new RegExp(step[1]);
+						curval = curval.replace(re,'');
+					}
+				}
 				else {
 					logger.error("Unknown virtual calculation: "+step[0],schema.name+'.'+DataSetName);
 				}
@@ -706,15 +713,17 @@ async function LoadDataSetAsync(schema) {
 				let ColPos = HeaderRow.indexOf(colname);
 				let UniqueList = new Set();
 				for (let CSVRow of CSVObj) {
-					UniqueList.add(TransformVal(CSVRow[ColPos],colname));
+					let val = TransformVal(CSVRow[ColPos],colname);
+					val = (val === undefined || val === null) ? val : val.toLowerCase();
+					UniqueList.add(val);
 				}
 				logger.silly("Unique Set of "+colname+": "+JSON.stringify(Array.from(UniqueList)),schema.name+'.'+DataSetName);
 				
 				var ForeignColName = FileSchemas[DataSetName].columns[FileSchemas[DataSetName].columns[colname].servesas].link.split(".").reverse()[0];
 				var ForeignTableName = FileSchemas[DataSetName].columns[FileSchemas[DataSetName].columns[colname].servesas].link.split(".").reverse()[1];
-				var DBString = 'SELECT ID,'+ForeignColName+' FROM '+ForeignTableName+' WHERE '+ForeignColName+" IN ('"+Array.from(UniqueList).join("','")+"')";
+				var DBString = 'SELECT ID,'+ForeignColName+' FROM '+ForeignTableName+' WHERE lower('+ForeignColName+") IN ('"+Array.from(UniqueList).join("','")+"')";
 				DBString += " UNION ALL SELECT orig.ID,aka.VAL FROM "+ForeignTableName+"_aka aka JOIN "+ForeignTableName+" orig ON aka."+ForeignTableName+"ID = orig.id";
-				DBString += " WHERE val IN ('"+Array.from(UniqueList).join("','")+"');";
+				DBString += " WHERE lower(val) IN ('"+Array.from(UniqueList).join("','")+"');";
 				logger.silly(" "+DBString,schema.name+'.'+DataSetName);
 				PromiseSet.push(db.query(DBString));
 			}

@@ -51,7 +51,11 @@
 			"PRECINCT_NAME": {
 				"servesas":"votelocale"
 			},
-			"CANDIDATE_FULL_NAME": {
+			"Candidate_Name": {
+				"virtualcalc": [
+					["readfrom","CANDIDATE_FULL_NAME"],
+					["replace_regexp","[A-Z]{2,3} - "]
+				],
 				"servesas":"candidate"
 			},
 			"TOTAL": {
