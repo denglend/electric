@@ -28,3 +28,7 @@ exports.ClearResultDir = async function() {
 		//
 	}
 };
+
+exports.RemoveFileExtension = function(fn) {
+	return fn.replace(/\.[^\.]*$/,'');
+};

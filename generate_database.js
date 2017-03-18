@@ -4,6 +4,7 @@ var fs = Promise.promisifyAll(require('fs'));
 var csvparse = Promise.promisify(require('csv-parse'));
 var csvstringify = Promise.promisify(require('csv-stringify'));
 var merge = require('deepmerge');
+var XLSX = require('xlsx');
 var logger = require('./util/logger');
 var file = require('./util/file');
 var secrets = require("./secrets");
@@ -192,11 +193,13 @@ async function LoadDataSetAsync(schema) {
 			}
 			else if (fn.slice(-8).toLowerCase() == '_aka.csv') {
 				logger.debug("   "+fn,schema.name);
-				CSVAKASet.add(fn.slice(0,-4));
+				//CSVAKASet.add(fn.slice(0,-4));
+				CSVAKASet.add(fn);
 			}
-			else if (fn.slice(-4).toLowerCase() == '.csv') {
+			else if (fn.slice(-4).toLowerCase() == '.csv' || fn.slice(-4).toLowerCase() == '.xls' || fn.slice(-5).toLowerCase() == '.xlsx') {
 				logger.debug("   "+fn,schema.name);
-				CSVOpenSet.push(fn.slice(0,-4));
+				//CSVOpenSet.push(fn.slice(0,-4));
+				CSVOpenSet.push(fn);
 			}
 		});
 		var JSONData = await Promise.all(PromiseSet);
@@ -225,7 +228,8 @@ async function LoadDataSetAsync(schema) {
 			}
 			logger.silly("Read individual file schema for "+schema.name+"/"+DataObj.name+".  Schema is:"+JSON.stringify(FileSchemas[DataObj.name],null,4));
 		}
-		for (let CSVName of CSVOpenSet) {
+		for (let CSVNameWExt of CSVOpenSet) {
+			let CSVName = file.RemoveFileExtension(CSVNameWExt);
 			if (FileSchemas[CSVName] === undefined) {
 				logger.debug("    No explicit schema file for so using default schema",schema.name+'.'+CSVName);
 				FileSchemas[CSVName] = merge({},schema);
@@ -246,14 +250,15 @@ async function LoadDataSetAsync(schema) {
 		*/
 		logger.verbose("Data Subfolder Parsing Round "+DataSubFolderRound,schema.name);
 		var PromiseSet = [];
-		for (let CurDataSetName of CSVOpenSet) {
+		for (let CurDataSetNameWExt of CSVOpenSet) {
+			let CurDataSetName = file.RemoveFileExtension(CurDataSetNameWExt);
 			let CurSchema = FileSchemas[CurDataSetName];
 			logger.debug(" Dependencies: "+JSON.stringify(CurSchema.dependencies),schema.name+'.'+CurDataSetName);
 			if (CurSchema.dependencies === undefined || CurSchema.dependencies.filter(function(d) { 
 				return d.startsWith(schema.name+'.') && CSVClosedSet.indexOf(d.slice(schema.name.length+1)) == -1;
 			}).length == 0) {
 				logger.verbose(" Parsing ",schema.name+"."+CurDataSetName);
-				PromiseSet.push(HandleCSVFile(CurDataSetName));	
+				PromiseSet.push(HandleCSVFile(CurDataSetNameWExt));	
 			}
 		}
 		await Promise.all(PromiseSet);
@@ -276,9 +281,16 @@ async function LoadDataSetAsync(schema) {
 
 		return;
 	}
-	async function HandleCSVFile(DataSetName) {
-		var CSVRawData = await fs.readFileAsync('data/'+schema.name+'/'+DataSetName+".csv",'utf8');
-		var CSVObj =  await csvparse(CSVRawData);
+	async function HandleCSVFile(DataSetNameWExt) {
+		var CSVRawData,CSVObj;
+		if (DataSetNameWExt.slice(-4) == '.csv') {
+			CSVRawData = await fs.readFileAsync('data/'+schema.name+'/'+DataSetNameWExt,'utf8');
+			CSVObj =  await csvparse(CSVRawData);
+		}
+		if (DataSetNameWExt.slice(-4) == '.xls' || DataSetNameWExt.slice(-5) == '.xlsx') {
+			CSVObj = await GetXLSData(DataSetNameWExt);
+		}
+		var DataSetName = file.RemoveFileExtension(DataSetNameWExt);
 		var HeaderRow = CSVObj.splice(0,1)[0];
 		logger.debug(" Got CSV File",schema.name+'.'+DataSetName);
 		logger.debug("  Header Row: "+JSON.stringify(HeaderRow),schema.name+'.'+DataSetName);
@@ -317,7 +329,7 @@ async function LoadDataSetAsync(schema) {
 		var DateColumns = HeaderRow.filter(FilterDateCols);
 
 		var ExternalAKAMap = new Map();
-		var HasExternalAKA = CSVAKASet.has(DataSetName+'_aka');
+		var HasExternalAKA = CSVAKASet.has(DataSetName+'_aka.csv');
 		
 		if (ExternalLinkColumns.length>0) logger.debug("  External Link Columns: "+JSON.stringify(ExternalLinkColumns),schema.name+'.'+DataSetName); 
 		if (InternalLinkColumns.length>0) logger.debug("  Internal Link Columns: "+JSON.stringify(InternalLinkColumns),schema.name+'.'+DataSetName); 
@@ -340,11 +352,16 @@ async function LoadDataSetAsync(schema) {
 		}
 /*CURRENT STATUS: 
 	First
-	Then
-		Need to process namespaces into WHERE clauses for external and internal links
 		Subfolders
-		Rename affiliations as elections_affiliations so that it's clear it only applies to elections data
-		Resolve columns that have a mapping eg in usa_county (maybe create a map for each column similar to servesas that exists for each column)
+			Perhaps: https://github.com/fshost/node-dir
+			or: https://github.com/pvorb/node-dive
+			or: https://github.com/thlorenz/readdirp
+		Flag general vs primary?
+	Then
+		Create README and LICENSE files
+		Need to process namespaces into WHERE clauses for external and internal links
+		Read xls/xls -- started with GetXLSData
+			Added, but still need to add reading _aka files from xls/xlsx
 		Error Handling
 			Do we need TRANSACTION?
 			External/Internal links that can't be resolved. e.g. - Currently const usa_states parent can't be resolved
@@ -354,9 +371,8 @@ async function LoadDataSetAsync(schema) {
 	Then Then
 		Command line options
 		Will ETL functionality be needed to:
-			Read xls/xlsx
 			normalize wide data
-		Add license text so that it can ultimately be displayed on website
+		Add license text into DB so that it can ultimately be displayed on website
 		Cleanup!
 
 */
@@ -538,7 +554,7 @@ async function LoadDataSetAsync(schema) {
 
 
 		CSVClosedSet.push(DataSetName);
-		CSVOpenSet.splice(CSVOpenSet.indexOf(DataSetName),1);
+		CSVOpenSet.splice(CSVOpenSet.indexOf(DataSetNameWExt),1);
 		return CSVObj;
 
 		async function CopyArrayToDB(tablename,array) {
@@ -569,7 +585,9 @@ async function LoadDataSetAsync(schema) {
 		}
 		function TransformVal(val,colname) {
 			//Returns the given value with any transformations specified by the column schema applied
-			val = val === null ? null : val.replace(/'/g, "''").trim();
+			//val = (val === null || val === undefined) ? null : val.replace(/'/g, "''").trim();
+			if (val === null || val === undefined) return val;
+			val = val.replace(/'/g, "''").trim();
 			if (FileSchemas[DataSetName].columns[colname].mapping !== undefined) {
 				let match = undefined;
 				if (FileSchemas[DataSetName].columns[colname].mapping.regex !== undefined) {
@@ -586,7 +604,6 @@ async function LoadDataSetAsync(schema) {
 					}
 				}
 				if (match  === undefined) {
-					debugger;
 					logger.warn("Mapping undefined for val: '"+val+"' of column: '"+colname+"'",schema.name+'.'+DataSetName);
 				}
 				else {
@@ -677,6 +694,13 @@ async function LoadDataSetAsync(schema) {
 		return db.query(Query);
 
 
+	}
+	async function GetXLSData(filename) {
+		var raw = await fs.readFileAsync('data/'+schema.name+'/'+filename,'binary');
+		var workbook = XLSX.read(raw, {type:"binary"});
+		var first_sheet_name = workbook.SheetNames[0];
+		return XLSX.utils.sheet_to_json(workbook.Sheets[first_sheet_name],{header:1});
+		
 	}
 
 }
