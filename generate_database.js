@@ -156,7 +156,6 @@ async function LoadDataSetAsync(schema) {
 		ParseDataSubFolderNextRound()
 	*/
 
-	//var JSONOpenSet = [];
 	var CSVOpenSet = [];
 	var CSVClosedSet = [];
 	var CSVAKASet = new Set();
@@ -168,7 +167,6 @@ async function LoadDataSetAsync(schema) {
 	//logger.debug("Initial schema is:");
 	//logger.debug(JSON.stringify(schema,null,4));
 	try {
-		//var FileNameList = await fs.readdirAsync('data/'+schema.name);
 		var FileNameList = await dir.filesAsync('data/'+schema.name);
 		logger.debug("Files: "+JSON.stringify(FileNameList),schema.name);
 	}
@@ -186,24 +184,16 @@ async function LoadDataSetAsync(schema) {
 		logger.debug("  Entering SetupSchemas. Found Files:",schema.name);
 		filenames.forEach(function(fn) {
 			fn = fn.replace(/data\/.*?\//,'');
-			//if (fn.toLowerCase() == 'all.json') {
-			if (fn.slice(-8).toLowerCase() == 'all.json') {
+			if (fn.slice(-5).toLowerCase() == '.json' ) {
 				logger.debug("   "+fn,schema.name);
-				PromiseSet.push(fs.readFileAsync('data/'+schema.name+'/'+fn));
-			}
-			else if (fn.slice(-5).toLowerCase() == '.json' ) {
-				logger.debug("   "+fn,schema.name);
-				//JSONOpenSet.push(fn);
 				PromiseSet.push(fs.readFileAsync('data/'+schema.name+'/'+fn));
 			}
 			else if (fn.slice(-8).toLowerCase() == '_aka.csv') {
 				logger.debug("   "+fn,schema.name);
-				//CSVAKASet.add(fn.slice(0,-4));
 				CSVAKASet.add(fn);
 			}
 			else if (fn.slice(-4).toLowerCase() == '.csv' || fn.slice(-4).toLowerCase() == '.xls' || fn.slice(-5).toLowerCase() == '.xlsx') {
 				logger.debug("   "+fn,schema.name);
-				//CSVOpenSet.push(fn.slice(0,-4));
 				CSVOpenSet.push(fn);
 			}
 		});
@@ -260,18 +250,6 @@ async function LoadDataSetAsync(schema) {
 			}
 			logger.silly("Read individual file schema for "+schema.name+"/"+DataObj.name+".  Schema is:"+JSON.stringify(FileSchemas[DataObj.name],null,4));
 		}
-		/*
-		for (let CSVNameWExt of CSVOpenSet) {
-			let CSVName = file.RemoveFileExtension(CSVNameWExt);
-			if (FileSchemas[CSVName] === undefined) {
-				logger.debug("    No explicit schema file for so using default schema",schema.name+'.'+CSVName);
-				FileSchemas[CSVName] = merge({},schema);
-				for (let col in FileSchemas[CSVName].columns) { 
-					//Add servesas to all columns that don't have them (so we can easily find the logical col name later)
-					if (FileSchemas[CSVName].columns[col].servesas === undefined) FileSchemas[CSVName].columns[col].servesas = col;
-				}
-			}
-		}*/
 
 	}
 	async function ParseDataSubFolderNextRound() {
@@ -385,13 +363,10 @@ async function LoadDataSetAsync(schema) {
 		}
 /*CURRENT STATUS: 
 	First
-		Flag general vs primary?
 	Then
 		Automatically create name field in JSON files, since code now assumes it will be the same as the file name
 		Create README and LICENSE files
 		Need to process namespaces into WHERE clauses for external and internal links
-		Read xls/xls -- started with GetXLSData
-			Added, but still need to add reading _aka files from xls/xlsx
 		Error Handling
 			Do we need TRANSACTION?
 			External/Internal links that can't be resolved. e.g. - Currently const usa_states parent can't be resolved
@@ -571,7 +546,6 @@ async function LoadDataSetAsync(schema) {
 			logger.verbose("  Pass 5: Import AKAs from external file: "+DataSetName+'_aka.csv',schema.name+'.'+DataSetName);
 			var AKACSVRawData = await fs.readFileAsync('data/'+schema.name+'/'+DataSetName+"_aka.csv",'utf8');
 			var AKACSVObj =  await csvparse(AKACSVRawData);
-			//var AKAHeaderRow = AKACSVObj.splice(0,1)[0];
 			let NamePos = AKACSVObj[0].indexOf("name");
 			for (let i =1;i<AKACSVObj.length;i++) {
 				AKACSVObj[i][NamePos] = ExternalAKAMap.get(AKACSVObj[i][NamePos]);
@@ -615,7 +589,6 @@ async function LoadDataSetAsync(schema) {
 		}
 		function TransformVal(val,colname) {
 			//Returns the given value with any transformations specified by the column schema applied
-			//val = (val === null || val === undefined) ? null : val.replace(/'/g, "''").trim();
 			if (val === null || val === undefined) return val;
 			val = val.replace(/'/g, "''").trim();
 			if (FileSchemas[DataSetName].columns[colname].mapping !== undefined) {
