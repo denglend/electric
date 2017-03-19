@@ -1,0 +1,12 @@
+{
+		"name":"dc/08_older/general/all",
+		"columns": {
+			"electiontype": {
+				"type":"link",
+				"link":"election_electiontypes.name",
+				"constant":"General"
+			}
+			
+
+		}
+	}

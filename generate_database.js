@@ -11,7 +11,7 @@ var logger = require('./util/logger');
 var file = require('./util/file');
 var str = require('./util/str');
 var secrets = require("./secrets");
-logger.level = "debug";
+logger.level = "verbose";
 
 var pg = require("pg");
 Object.keys(pg).forEach(function(key) {
@@ -385,12 +385,9 @@ async function LoadDataSetAsync(schema) {
 		}
 /*CURRENT STATUS: 
 	First
-		Subfolders
-			Perhaps: https://github.com/fshost/node-dir
-			or: https://github.com/pvorb/node-dive
-			or: https://github.com/thlorenz/readdirp
 		Flag general vs primary?
 	Then
+		Automatically create name field in JSON files, since code now assumes it will be the same as the file name
 		Create README and LICENSE files
 		Need to process namespaces into WHERE clauses for external and internal links
 		Read xls/xls -- started with GetXLSData

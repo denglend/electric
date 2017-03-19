@@ -25,9 +25,11 @@
 						"BALLOTS CAST - BLANK":"Contest Meta",
 						"AT - LARGE MEMBER OF THE COUNCIL DISTRICT OF COLUMBIA":"Member of the Council",
 						"UNITED STATES REPRESENTATIVE DISTRICT OF COLUMBIA":"Member of the House of Representatives",
+						"UNITED STATES REPRESENTATIVE":"Member of the House of Representatives",
 						"UNITED STATES SENATOR DISTRICT OF COLUMBIA":"Senator",
 						"ADVISORY REFERENDUM B DISTRICT OF COLUMBIA":"Referendum",
-						"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"Chairman of the Council"			
+						"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"Chair of the Council",
+						"MAYOR OF THE DISTRICT OF COLUMBIA":"Mayor"
 						
 					},
 					"regex": {
@@ -36,8 +38,15 @@
 						".*MEMBER.*STATE BOARD.*":"Member of the Board of Education",
 						".*MEMBER OF THE COUNCIL.*":"Member of the Council",
 						".*Proposed Charter Amendment.*":"Referendum",
+						".*PROPOSED CHARTER AMENDMENT.*":"Referendum",
 						".*DELEGATE.*U\\.*S\\.* HOUSE OF REPRESENTATIVES.*":"Delegate to the House of Representatives",
-						".*PRESIDENT AND VICE PRESIDENT.*":"President"
+						".*PRESIDENT AND VICE PRESIDENT.*":"President",
+						".*PRESIDENTIAL PREFERENCE":"President",
+						".*BALLOTS CAST.*":"Contest Meta",
+						"CHAIRPERSON OF THE.*COMMITTEE.*":"Chair of the Committee",
+						"REGISTERED VOTERS.*":"Contest Meta",
+						".*COMMITTEEMAN.*":"Member of the Committee",
+						".*COMMITTEEWOMAN.*":"Member of the Committee"
 					}
 
 
@@ -58,6 +67,17 @@
 				"servesas":"affiliation"
 
 			},
+			"ELECTION_NAME": {
+				"servesas":"electiontype",
+				"mapping": {
+					"direct": {
+						"D.C. General Election":"General",
+						"D.C. Generation Election":"General",
+						"D.C. Primary Election":"Primary",
+						"D.C. Special Election":"Special"
+					}
+				}
+			},
 			"cl": {
 				"virtualcalc": [
 					["readfrom","CONTEST_NAME"]
@@ -71,16 +91,19 @@
 						
 						"REGISTERED VOTERS - TOTAL":"District of Columbia",
 						"UNITED STATES REPRESENTATIVE DISTRICT OF COLUMBIA":"District of Columbia",
+						"UNITED STATES REPRESENTATIVE":"District of Columbia",
 						"UNITED STATES SENATOR DISTRICT OF COLUMBIA":"District of Columbia",
-						"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"District of Columbia"
+						"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"District of Columbia",
+						"MAYOR OF THE DISTRICT OF COLUMBIA":"District of Columbia"
 					},
 					"regex": {
 						".*?([0-9]{1}[A-Z]{1}[0-9]{2}) SINGLE MEMBER.*":"ANC SMD $1",
 						"ADVISORY NEIGHBORHOOD COMMISSIONER ([0-9]{1}[A-Z]{1}[0-9]{2})":"ANC SMD $1",
 						".*DELEGATE.*U\\.S\\. HOUSE OF REPRESENTATIVES.*":"District of Columbia",
 						".*Proposed Charter Amendment.*":"District of Columbia",
+						".*PROPOSED CHARTER AMENDMENT.*":"District of Columbia",
 						".*ADVISORY REFERENDUM.*":"District of Columbia",
-						".*AT - LARGE MEMBER.*":"District of Columbia",
+						".*AT *- *LARGE MEMBER.*":"District of Columbia",
 						".*WARD ONE.*":"Ward 1",
 						".*WARD TWO.*":"Ward 2",
 						".*WARD THREE.*":"Ward 3",
@@ -89,7 +112,11 @@
 						".*WARD SIX.*":"Ward 6",
 						".*WARD SEVEN.*":"Ward 7",
 						".*WARD EIGHT.*":"Ward 8",
-						".*PRESIDENT AND VICE PRESIDENT.*":"United States"
+						".*PRESIDENT AND VICE PRESIDENT.*":"United States",
+						".*PRESIDENTIAL PREFERENCE":"United States",
+						".*BALLOTS CAST.*":"District of Columbia",
+						"NATIONAL.*":"United States",
+						".*REGISTERED VOTERS.*":"District of Columbia"
 					}
 
 

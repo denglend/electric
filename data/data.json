@@ -41,11 +41,18 @@
 			"name":{"type":"string"}
 		}
 	},
-
+	{
+		"name":"election_electiontypes",
+		"type":"dim",
+		"dependencies":[],
+		"columns": {
+			"name":{"type":"string"}
+		}
+	},
 	{
 		"name":"election_votes",
 		"type":"fact",
-		"dependencies": ["locales","election_candidates","election_contesttypes","election_affiliations"],
+		"dependencies": ["locales","election_candidates","election_contesttypes","election_affiliations","election_electiontypes"],
 		"columns": {
 			"contesttype": {
 				"type":"link",
@@ -69,6 +76,10 @@
 			"affiliation": {
 				"type":"link",
 				"link":"election_affiliations.name"
+			},
+			"electiontype": {
+				"type":"link",
+				"link":"election_electiontypes.name"
 			},
 			"count": {
 				"type":"int"
