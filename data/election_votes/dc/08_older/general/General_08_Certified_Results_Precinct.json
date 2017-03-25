@@ -1,117 +1,105 @@
 {
-		"name":"dc/08_older/general/General_08_Certified_Results_Precinct",
-		"namespace": [
-			{
-				"type":"link",
-				"linkname":"locales.parent.parent.name",
-				"linkvalue":"Washington, DC"
-			},
-			{
-				"type":"link",
-				"linkname":"locales.localestype.name",
-				"linkvalue":"Precinct"
+	"name":"dc/08_older/general/General_08_Certified_Results_Precinct",
+	"columns": {
+		"electiondate": {
+			"type":"date",
+			"constant":"2008-11-04"
+		},
+		"CONTEST_FULL_NAME": {
+			"servesas":"contesttype",
+			"mapping": {
+				"direct": {
+					"Registration & Turnout":"Contest Meta",
+					"BALLOTS CAST - BLANK":"Contest Meta",
+					"BALLOTS CAST - TOTAL":"Contest Meta",
+					"REGISTERED VOTERS - TOTAL":"Contest Meta",
+					"UNITED STATES REPRESENTATIVE":"Member of the House of Representatives",
+					"UNITED STATES SENATOR":"Senator",
+					"ADVISORY REFERENDUM B DISTRICT OF COLUMBIA":"Referendum",
+					"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"Chairman of the Council"			
+					
+				},
+				"regex": {
+					".*?([0-9]{1}[A-Z]{1}[0-9]{2}) SINGLE MEMBER.*":"Commissioner",
+					"ADVISORY NEIGHBORHOOD COMMISSIONER ([0-9]{1}[A-Z]{1}[0-9]{2})":"Commissioner",
+					"ANC FOR SMD ([0-9]{1}[A-Z]{1}[0-9]{2})":"Commissioner",
+					".*MEMBER.*STATE BOARD.*":"Member of the Board of Education",
+					".*MEMBER OF THE COUNCIL.*":"Member of the Council",
+					".*Proposed Charter Amendment.*":"Referendum",
+					".*DELEGATE.*U\\.*S\\.* HOUSE OF REPRESENTATIVES.*":"Delegate to the House of Representatives",
+					".*PRESIDENT AND VICE PRESIDENT.*":"President",
+					"UNITED STATES REPRESENTATIVE.*":"Member of the House of Representatives",
+					"UNITED STATES SENATOR.*":"Senator"
+				}
+
+
 			}
-		],
-		"columns": {
-			"electiondate": {
-				"type":"date",
-				"constant":"2008-11-04"
-			},
-			"CONTEST_FULL_NAME": {
-				"servesas":"contesttype",
-				"mapping": {
-					"direct": {
-						"Registration & Turnout":"Contest Meta",
-						"BALLOTS CAST - BLANK":"Contest Meta",
-						"BALLOTS CAST - TOTAL":"Contest Meta",
-						"REGISTERED VOTERS - TOTAL":"Contest Meta",
-						"UNITED STATES REPRESENTATIVE":"Member of the House of Representatives",
-						"UNITED STATES SENATOR":"Senator",
-						"ADVISORY REFERENDUM B DISTRICT OF COLUMBIA":"Referendum",
-						"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"Chairman of the Council"			
-						
-					},
-					"regex": {
-						".*?([0-9]{1}[A-Z]{1}[0-9]{2}) SINGLE MEMBER.*":"Commissioner",
-						"ADVISORY NEIGHBORHOOD COMMISSIONER ([0-9]{1}[A-Z]{1}[0-9]{2})":"Commissioner",
-						"ANC FOR SMD ([0-9]{1}[A-Z]{1}[0-9]{2})":"Commissioner",
-						".*MEMBER.*STATE BOARD.*":"Member of the Board of Education",
-						".*MEMBER OF THE COUNCIL.*":"Member of the Council",
-						".*Proposed Charter Amendment.*":"Referendum",
-						".*DELEGATE.*U\\.*S\\.* HOUSE OF REPRESENTATIVES.*":"Delegate to the House of Representatives",
-						".*PRESIDENT AND VICE PRESIDENT.*":"President",
-						"UNITED STATES REPRESENTATIVE.*":"Member of the House of Representatives",
-						"UNITED STATES SENATOR.*":"Senator"
-					}
+		},
 
-
-				}
-			},
-
-			"PRECINCT_NAME": {
-				"servesas":"votelocale"
-			},
-			"Candidate_Name": {
-				"virtualcalc": [
-					["readfrom","CANDIDATE_FULL_NAME"],
-					["replace_regexp","[A-Z]{2,3} - "]
-				],
-				"servesas":"candidate"
-			},
-			"TOTAL": {
-				"servesas":"count"
-			},
-			"candidate_party_id": {
-				"servesas":"affiliation",
-				"mapping": {
-					"direct": {
-						"2":"Democratic",
-						"3":"Republican",
-						"4":"Statehood Green",
-						"5":"Libertarian",
-						"8":"Independent"
-					}
-				}
-
-			},
-			"cl": {
-				"virtualcalc": [
-					["readfrom","CONTEST_FULL_NAME"]
-				],
-				"servesas":"contestlocale",
-				"mapping": {
-					"direct": {
-						"BALLOTS CAST - BLANK":"District of Columbia",
-						"BALLOTS CAST - TOTAL":"District of Columbia",
-						"Registration & Turnout":"District of Columbia",
-						"REGISTERED VOTERS - TOTAL":"District of Columbia",
-						"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"District of Columbia"
-					},
-					"regex": {
-						".*?([0-9]{1}[A-Z]{1}[0-9]{2}) SINGLE MEMBER.*":"ANC SMD $1",
-						"ADVISORY NEIGHBORHOOD COMMISSIONER ([0-9]{1}[A-Z]{1}[0-9]{2})":"ANC SMD $1",
-						"ANC FOR SMD ([0-9]{1}[A-Z]{1}[0-9]{2})":"ANC SMD $1",
-						".*DELEGATE.*U\\.*S\\.* HOUSE OF REPRESENTATIVES.*":"District of Columbia",
-						".*Proposed Charter Amendment.*":"District of Columbia",
-						".*ADVISORY REFERENDUM.*":"District of Columbia",
-						".*AT - LARGE MEMBER.*":"District of Columbia",
-						".*AT-LARGE MEMBER.*":"District of Columbia",
-						".*WARD ONE.*":"Ward 1",
-						".*WARD TWO.*":"Ward 2",
-						".*WARD THREE.*":"Ward 3",
-						".*WARD FOUR.*":"Ward 4",
-						".*WARD FIVE.*":"Ward 5",
-						".*WARD SIX.*":"Ward 6",
-						".*WARD SEVEN.*":"Ward 7",
-						".*WARD EIGHT.*":"Ward 8",
-						".*PRESIDENT AND VICE PRESIDENT.*":"United States",
-						"UNITED STATES REPRESENTATIVE.*":"District of Columbia",
-						"UNITED STATES SENATOR.*":"District of Columbia"
-					}
-
-
+		"PRECINCT_NAME": {
+			"servesas":"votelocale"
+		},
+		"Candidate_Name": {
+			"virtualcalc": [
+				["readfrom","CANDIDATE_FULL_NAME"],
+				["replace_regexp","[A-Z]{2,3} - "]
+			],
+			"servesas":"candidate"
+		},
+		"TOTAL": {
+			"servesas":"count"
+		},
+		"candidate_party_id": {
+			"servesas":"affiliation",
+			"mapping": {
+				"direct": {
+					"2":"Democratic",
+					"3":"Republican",
+					"4":"Statehood Green",
+					"5":"Libertarian",
+					"8":"Independent"
 				}
 			}
 
+		},
+		"cl": {
+			"virtualcalc": [
+				["readfrom","CONTEST_FULL_NAME"]
+			],
+			"servesas":"contestlocale",
+			"mapping": {
+				"direct": {
+					"BALLOTS CAST - BLANK":"District of Columbia",
+					"BALLOTS CAST - TOTAL":"District of Columbia",
+					"Registration & Turnout":"District of Columbia",
+					"REGISTERED VOTERS - TOTAL":"District of Columbia",
+					"CHAIRMAN OF THE COUNCIL DISTRICT OF COLUMBIA":"District of Columbia"
+				},
+				"regex": {
+					".*?([0-9]{1}[A-Z]{1}[0-9]{2}) SINGLE MEMBER.*":"ANC SMD $1",
+					"ADVISORY NEIGHBORHOOD COMMISSIONER ([0-9]{1}[A-Z]{1}[0-9]{2})":"ANC SMD $1",
+					"ANC FOR SMD ([0-9]{1}[A-Z]{1}[0-9]{2})":"ANC SMD $1",
+					".*DELEGATE.*U\\.*S\\.* HOUSE OF REPRESENTATIVES.*":"District of Columbia",
+					".*Proposed Charter Amendment.*":"District of Columbia",
+					".*ADVISORY REFERENDUM.*":"District of Columbia",
+					".*AT - LARGE MEMBER.*":"District of Columbia",
+					".*AT-LARGE MEMBER.*":"District of Columbia",
+					".*WARD ONE.*":"Ward 1",
+					".*WARD TWO.*":"Ward 2",
+					".*WARD THREE.*":"Ward 3",
+					".*WARD FOUR.*":"Ward 4",
+					".*WARD FIVE.*":"Ward 5",
+					".*WARD SIX.*":"Ward 6",
+					".*WARD SEVEN.*":"Ward 7",
+					".*WARD EIGHT.*":"Ward 8",
+					".*PRESIDENT AND VICE PRESIDENT.*":"United States",
+					"UNITED STATES REPRESENTATIVE.*":"District of Columbia",
+					"UNITED STATES SENATOR.*":"District of Columbia"
+				}
+
+
+			}
 		}
+
 	}
+}

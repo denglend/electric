@@ -1,0 +1,34 @@
+{
+	"name":"usa/usa_states",
+	"dependencies":["localetypes","sources","locales.countries"],
+	"columns": {
+		"source": {
+			"type":"link",
+			"link":"sources.name",
+			"constant":"American National Standards Institute (ANSI) Codes for States, the District of Columbia, Puerto Rico, and the Insular Areas of the United States"
+		},
+		"STATE_NAME": {"servesas":"name"},
+		"parent": {
+			"type":"link",
+			"link":"locales.name",
+			"constant":"United States of America"
+		},
+		"STATE": {
+			"type":"int",
+			"servesas":"state_fips"
+		},
+		"STUSAB": {
+			"type":"aka",
+			"aka":"locales.name"
+		},
+		"localetype": {
+			"type":"link",
+			"link":"localetypes.name",
+			"constant":"State"
+		},
+		"STATENS": {
+			"type":"int",
+			"servesas":"gnis_id"
+		}
+	}
+}

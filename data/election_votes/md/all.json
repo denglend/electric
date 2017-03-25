@@ -1,0 +1,73 @@
+{
+	"name":"md/all",
+	"filter": [
+		["Write-In?","neq","Y"]
+	],
+	"split": "County",
+	"columns": {
+		"OFFICE NAME": {
+			"servesas":"contesttype",
+			"mapping": {
+				"direct": {
+					"President - Vice Pres":"President",
+					"U.S. Senator":"Senator",
+					"Rep in Congress":"Member of the House of Representatives",
+					"Board of Education":"Member of the Board of Education"					
+				}
+			}
+		},
+		"Precinct": {
+			"servesas":"votelocale",
+			"virtualcalc": [
+				["push","Precinct "],
+				["readfrom","Election District"],
+				["push"],
+				["push","0"],
+				["push",2],
+				["leftpad"],
+				["push"],
+				["push","-"],
+				["readfrom","Election Precinct"],
+				["push"],
+				["push","0"],
+				["push",3],
+				["leftpad"],
+				["concat"],
+				["concat"],
+				["concat"]
+
+			]
+		},
+
+		"Candidate Name": {
+			"servesas":"candidate"
+		},
+		"Election Night Votes": {
+			"servesas":"count"
+		},
+		"Party": {
+			"servesas":"affiliation"
+
+		},
+		"ELECTION_NAME": {
+			"servesas":"electiontype",
+			"constant":"General"
+		},
+		"cl": {
+			"virtualcalc": [
+				["readfrom","OFFICE_NAME"]
+			],
+			"servesas":"contestlocale",
+			"mapping": {
+				"direct": {
+					"President - Vice Pres":"United States",
+					"U.S. Senator":"United States",
+					"Rep in Congress":"United States",
+					"Board of Education":"Maryland"
+				}
+			
+			}
+
+		}
+	}
+}

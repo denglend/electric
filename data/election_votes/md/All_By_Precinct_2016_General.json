@@ -1,0 +1,9 @@
+{
+	"name":"md/All_By_Precinct_2016_General",
+	"columns": {
+		"electiondate": {
+				"type":"date",
+				"constant":"2016-11-08"
+			}
+	}
+}

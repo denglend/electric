@@ -1,0 +1,14 @@
+{
+	"name":"usa/local/all",
+	"dependencies":["locales.usa/usa_county"],
+	"columns": {
+		"parent": {
+			"namespace": {
+				"ancestor": {
+					"localetypes.name":["County"],
+					"locales.name":["District of Columbia"]
+				}
+			}
+		}
+	}
+}

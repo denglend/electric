@@ -1,0 +1,25 @@
+{
+	"name":"dc/all",
+	"columns": {
+		"votelocale": {
+			"namespace": {
+					"ancestor": {
+						"localetypes.name":["State"],
+						"locales.name":["District of Columbia"]
+					}
+				}
+			},
+		"contestlocale": {
+			"namespace": {
+				"ancestor": {
+					"localetypes.name":["Country"],
+					"locales.name":["United States"]
+				},
+				"self": {
+					"localetypes.name":["Country","State","Ward","Precinct","Advisory Neighborhood Commission Single Member District"]
+				}
+			}
+
+		}
+	}
+}
