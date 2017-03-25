@@ -67,7 +67,16 @@
 				}
 			
 			}
-
-		}
+		},
+		"County": {"type":"ignore"},
+		"Election District": {"type":"ignore"},
+		"Election Precinct": {"type":"ignore"},
+		"Cong": {"type":"ignore"},
+		"Legs": {"type":"ignore"},
+		"Office Name": {"type":"ignore"},
+		"Office District": {"type":"ignore"},
+		"Winner": {"type":"ignore"},
+		"Write-In?": {"type":"ignore"},
+		"Election Night Votes Against": {"type":"ignore"}
 	}
 }

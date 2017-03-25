@@ -55,6 +55,9 @@ async function ParseDataFiles(data) {
 	
 	var ParseRound = 0;  var PrevOpenLen = -1;
 	await CreateDatabaseTables(DataFileObj);
+
+	/*
+	//Not clear what the purpose of this was...
 	let AKAEntries = [];
 	for (let schema of DataFileObj) {
 		if (schema.type == "dim") {
@@ -68,7 +71,9 @@ async function ParseDataFiles(data) {
 			AKAEntries.push(AKAEntry);
 		}
 	}
+
 	DataFileObj = DataFileObj.concat(AKAEntries);
+	*/
 
 	DataFileObj.forEach(function(el) {OpenSet.push(el.name);});				//add all data sets to Open Set
 	await ParseDataFileNextRound();
